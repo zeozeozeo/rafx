@@ -96,9 +96,9 @@ typedef RFX_ENUM(uint32_t, RfxBufferUsageFlags){
     RFX_USAGE_SCRATCH_BUFFER = RFX_BIT(6),                     // Scratch buffer
     RFX_USAGE_SHADER_BINDING_TABLE = RFX_BIT(7),               // Shader binding table
     RFX_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT = RFX_BIT(8), // AS Build Input
-    RFX_USAGE_MICROMAP_BUILD_INPUT = RFX_BIT(10),              // Micromap Build Input
-    RFX_USAGE_TRANSFER_SRC = RFX_BIT(11),                      // Allow buffer to be source of copy
-    RFX_USAGE_TRANSFER_DST = RFX_BIT(12),                      // Allow buffer to be destination of copy
+    RFX_USAGE_MICROMAP_BUILD_INPUT = RFX_BIT(9),               // Micromap Build Input
+    RFX_USAGE_TRANSFER_SRC = RFX_BIT(10),                      // Allow buffer to be source of copy
+    RFX_USAGE_TRANSFER_DST = RFX_BIT(11),                      // Allow buffer to be destination of copy
 };
 
 typedef enum {
@@ -222,8 +222,11 @@ typedef enum {
 } RfxBlendOp;
 
 typedef RFX_ENUM(uint8_t, RfxColorWriteMask){
-    RFX_COLOR_WRITE_RED = RFX_BIT(0),   RFX_COLOR_WRITE_GREEN = RFX_BIT(1), RFX_COLOR_WRITE_BLUE = RFX_BIT(2),
-    RFX_COLOR_WRITE_ALPHA = RFX_BIT(3), RFX_COLOR_WRITE_ALL = 0xF,
+    RFX_COLOR_WRITE_RED = RFX_BIT(0),   //
+    RFX_COLOR_WRITE_GREEN = RFX_BIT(1), //
+    RFX_COLOR_WRITE_BLUE = RFX_BIT(2),  //
+    RFX_COLOR_WRITE_ALPHA = RFX_BIT(3), //
+    RFX_COLOR_WRITE_ALL = 0xF,          //
 };
 
 typedef struct {
@@ -602,11 +605,11 @@ typedef RFX_ENUM(uint32_t, RfxUpscalerFlags){
     RFX_UPSCALER_NONE = 0,
     RFX_UPSCALER_HDR = RFX_BIT(0),
     RFX_UPSCALER_SRGB = RFX_BIT(1),
-    RFX_UPSCALER_DEPTH_INVERTED = RFX_BIT(4), // Near=1, Far=0
-    RFX_UPSCALER_DEPTH_INFINITE = RFX_BIT(5),
-    RFX_UPSCALER_DEPTH_LINEAR = RFX_BIT(6), // Linear ViewZ
-    RFX_UPSCALER_MV_UPSCALED = RFX_BIT(7),  // MVs are at output resolution
-    RFX_UPSCALER_MV_JITTERED = RFX_BIT(8),  // MVs include jitter
+    RFX_UPSCALER_DEPTH_INVERTED = RFX_BIT(2), // Near=1, Far=0
+    RFX_UPSCALER_DEPTH_INFINITE = RFX_BIT(3),
+    RFX_UPSCALER_DEPTH_LINEAR = RFX_BIT(4), // Linear ViewZ
+    RFX_UPSCALER_MV_UPSCALED = RFX_BIT(5),  // MVs are at output resolution
+    RFX_UPSCALER_MV_JITTERED = RFX_BIT(6),  // MVs include jitter
 };
 
 typedef struct {
@@ -735,7 +738,7 @@ typedef RFX_ENUM(uint32_t, RfxWindowFlags){
     RFX_WINDOW_SCALE_TO_MONITOR = RFX_BIT(10) // Scale content to monitor DPI/Scale
 };
 
-typedef RFX_ENUM(uint8_t, RfxFeatureSupportFlags){
+typedef RFX_ENUM(uint32_t, RfxFeatureSupportFlags){
     RFX_FEATURE_MESH_SHADER = RFX_BIT(0),
     RFX_FEATURE_RAY_TRACING = RFX_BIT(1),
     RFX_FEATURE_UPSCALE = RFX_BIT(2),
