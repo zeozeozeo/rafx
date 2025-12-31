@@ -1,0 +1,12 @@
+.cache/
+build/
+*.dll
+*.dll.a
+.zed/
+*.pdb
+*.exe
+*.lib
+.vs/
+.vscode/
+ignore_*
+__cmake_systeminformation/

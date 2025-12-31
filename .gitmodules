@@ -1,0 +1,9 @@
+[submodule "thirdparty/glfw"]
+	path = thirdparty/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "thirdparty/NRI"]
+	path = thirdparty/NRI
+	url = https://github.com/NVIDIA-RTX/NRI.git
+[submodule "thirdparty/NRD"]
+	path = thirdparty/NRD
+	url = https://github.com/NVIDIA-RTX/NRD.git
