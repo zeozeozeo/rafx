@@ -210,7 +210,7 @@ else()
     set(BACKEND_DEFINES RAFX_BACKEND_RGFW)
 endif()
 
-include_directories(${${CMAKE_CURRENT_SOURCE_DIR}}/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 if(BUILD_SHARED_LIBS)
     add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
 else()

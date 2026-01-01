@@ -10,7 +10,7 @@ set STAGE=dist
 rem build
 if not exist "%BUILD_DIR%" (mkdir %BUILD_DIR%)
 cd %BUILD_DIR%
-cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DRAFX_D3D12_SUPPORT=ON -DBUILD_SHARED_LIBS=ON -DRAFX_STATIC_SLANG=ON
+cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DRAFX_D3D12_SUPPORT=ON -DBUILD_SHARED_LIBS=ON -DRAFX_STATIC_SLANG=OFF
 cmake --build . --config Release
 if %errorlevel% neq 0 (exit /b %errorlevel%)
 cd ..
