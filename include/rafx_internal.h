@@ -381,6 +381,7 @@ struct InputState {
 struct CoreData {
     ~CoreData();
 
+    bool EnableValidation = true;
     nri::GraphicsAPI RequestedBackend = nri::GraphicsAPI::VK;
     RfxFeatureSupportFlags FeatureSupportFlags = 0;
     void* WindowHandle = nullptr;

@@ -220,8 +220,8 @@ static void NRIInitialize(nri::GraphicsAPI graphicsAPI) {
 
     nri::DeviceCreationDesc dcd = {};
     dcd.graphicsAPI = graphicsAPI;
-    dcd.enableGraphicsAPIValidation = true;
-    dcd.enableNRIValidation = true;
+    dcd.enableGraphicsAPIValidation = CORE.EnableValidation;
+    dcd.enableNRIValidation = CORE.EnableValidation;
     dcd.vkBindingOffsets = { 0, 128, 32, 64 };
     dcd.adapterDesc = &adapterDesc[0];
     NRI_CHECK(nri::nriCreateDevice(dcd, CORE.NRIDevice));
@@ -323,10 +323,14 @@ static void NRIInitialize(nri::GraphicsAPI graphicsAPI) {
     }
 }
 
-void rfxRequestBackend(RfxBackend backend) {
+void rfxRequestBackend(RfxBackend backend, bool enableValidation) {
     RFX_ASSERT(!CORE.WindowHandle && "rfxRequestBackend called after window creation");
+
+    CORE.EnableValidation = enableValidation;
+
     nri::GraphicsAPI api;
     switch (backend) {
+    case RFX_BACKEND_DEFAULT: return;
     case RFX_BACKEND_VULKAN: api = nri::GraphicsAPI::VK; break;
     case RFX_BACKEND_D3D12: api = nri::GraphicsAPI::D3D12; break;
     case RFX_BACKEND_D3D11: api = nri::GraphicsAPI::D3D11; break;

@@ -10,3 +10,4 @@ build/
 .vscode/
 ignore_*
 __cmake_systeminformation/
+dist/

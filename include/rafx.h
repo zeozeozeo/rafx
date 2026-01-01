@@ -667,10 +667,11 @@ typedef struct {
 } RfxUpscaleDesc;
 
 typedef RFX_ENUM(uint8_t, RfxBackend){
-    RFX_BACKEND_VULKAN,
-    RFX_BACKEND_D3D12,
-    RFX_BACKEND_D3D11, // Not that it works
-    RFX_BACKEND_NONE,  // Dummy backend, supports everything
+    RFX_BACKEND_DEFAULT, // Figure it out
+    RFX_BACKEND_VULKAN,  //
+    RFX_BACKEND_D3D12,   //
+    RFX_BACKEND_D3D11,   // Not that it works
+    RFX_BACKEND_NONE,    // Dummy backend, supports everything
 };
 
 typedef enum {
@@ -867,7 +868,7 @@ typedef enum {
 // Window
 //
 
-RAFX_API void rfxRequestBackend(RfxBackend backend); // Do this *before* opening the window
+RAFX_API void rfxRequestBackend(RfxBackend backend, bool enableValidation); // Do this *before* opening the window
 RAFX_API bool rfxOpenWindow(const char* title, int width, int height);
 RAFX_API bool rfxSupportsFeatures(RfxFeatureSupportFlags features);
 RAFX_API RfxFeatureSupportFlags rfxGetSupportedFeatures();

@@ -3,6 +3,7 @@ project(rafx)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(FETCHCONTENT_QUIET FALSE)
 
 set(RAFX_WINDOW_BACKEND "RGFW" CACHE STRING "Select window backend (RGFW or GLFW)")
 set_property(CACHE RAFX_WINDOW_BACKEND PROPERTY STRINGS "RGFW" "GLFW")
@@ -17,6 +18,8 @@ option(RAFX_UPSCALER_DLSS "Enable support for DLSS upscaler" OFF)
 option(RAFX_UPSCALER_FFX "Enable support for FFX (FidelityFX Super Resolution) upscaler" OFF)
 option(RAFX_UPSCALER_XESS "Enable support for XeSS upscaler" OFF)
 option(RAFX_BUILD_EXAMPLES "Build examples" OFF)
+option(RAFX_STATIC_SLANG "Build Slang from source instead of downloading binaries" OFF)
+option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
 # Arm64?
 if((CMAKE_GENERATOR_PLATFORM MATCHES "ARM64") OR (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64"))
@@ -130,31 +133,71 @@ else()
     message(FATAL_ERROR "Unsupported host")
 endif()
 
-if (NOT slang_SOURCE_DIR) # allow user override by -Dslang_SOURCE_DIR=xxx
+if(RAFX_STATIC_SLANG)
+    # This is hell
     CPMAddPackage(
         NAME slang
-        URL "https://github.com/shader-slang/slang/releases/download/v2025.24.2/slang-2025.24.2-${SLANG_BIN_PACKAGE_NAME}"
-        DOWNLOAD_ONLY true
+        GIT_SHALLOW TRUE
+        GITHUB_REPOSITORY shader-slang/slang
+        GIT_TAG v2025.24.2
+        GIT_PROGRESS TRUE
+        GIT_SUBMODULES_RECURSE FALSE
+        GIT_SUBMODULES "external/spirv-headers;external/vulkan;external/miniz;external/unordered_dense;external/lz4;external/lua"
+        OPTIONS
+            "SLANG_ENABLE_EXAMPLES OFF"
+            "SLANG_ENABLE_TESTS OFF"
+            "SLANG_ENABLE_SLANG_GLSLANG OFF"
+            "SLANG_ENABLE_SLANGI OFF"
+            "SLANG_ENABLE_SLANGRT OFF"
+            "SLANG_ENABLE_SLANGD OFF"
+            "SLANG_ENABLE_GFX OFF"
+            "SLANG_ENABLE_PREBUILT_BINARIES OFF"
+            "BUILD_SHARED_LIBS OFF"
+            "SLANG_EXCLUDE_DAWN ON"
+            "SLANG_EXCLUDE_TINT ON"
+            "SLANG_SLANG_LLVM_FLAVOR DISABLE"
+            "SLANG_ENABLE_OPTIX OFF"
+            "SLANG_ENABLE_SLANGC OFF"
+            "SLANG_ENABLE_SLANG_RHI OFF"
+            "SLANG_LIB_TYPE STATIC"
     )
-endif()
 
-add_library(slang::slang SHARED IMPORTED)
-add_library(slang::slang-glslang SHARED IMPORTED)
+    if(NOT TARGET slang::slang)
+        add_library(slang::slang ALIAS slang)
+    endif()
+else()
+    if(CMAKE_HOST_WIN32)
+        set(SLANG_BIN_PACKAGE_NAME "windows-x86_64.zip")
+    elseif(CMAKE_HOST_LINUX)
+        set(SLANG_BIN_PACKAGE_NAME "linux-x86_64.zip")
+    else()
+        message(FATAL_ERROR "Unsupported host for Slang binaries")
+    endif()
 
-if(CMAKE_HOST_WIN32)
-    set_target_properties(slang::slang PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES   "${slang_SOURCE_DIR}/include/"
-        IMPORTED_IMPLIB                 "${slang_SOURCE_DIR}/lib/slang.lib"
-        IMPORTED_LOCATION               "${slang_SOURCE_DIR}/bin/slang.dll"
-    )
-elseif(CMAKE_HOST_LINUX)
-    set_target_properties(slang::slang PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES   "${slang_SOURCE_DIR}/include/"
-        IMPORTED_LOCATION               "${slang_SOURCE_DIR}/lib/libslang.so"
-    )
-    target_link_libraries(slang::slang PUBLIC INTERFACE
-        "${slang_SOURCE_DIR}/lib/libslang.so"
-    )
+    if (NOT slang_SOURCE_DIR)
+        CPMAddPackage(
+            NAME slang
+            URL "https://github.com/shader-slang/slang/releases/download/v2025.24.2/slang-2025.24.2-${SLANG_BIN_PACKAGE_NAME}"
+            DOWNLOAD_ONLY true
+        )
+    endif()
+
+    if(NOT TARGET slang::slang)
+        add_library(slang::slang SHARED IMPORTED)
+        if(CMAKE_HOST_WIN32)
+            set_target_properties(slang::slang PROPERTIES
+                INTERFACE_INCLUDE_DIRECTORIES   "${slang_SOURCE_DIR}/include/"
+                IMPORTED_IMPLIB                 "${slang_SOURCE_DIR}/lib/slang.lib"
+                IMPORTED_LOCATION               "${slang_SOURCE_DIR}/bin/slang.dll"
+            )
+        elseif(CMAKE_HOST_LINUX)
+            set_target_properties(slang::slang PROPERTIES
+                INTERFACE_INCLUDE_DIRECTORIES   "${slang_SOURCE_DIR}/include/"
+                IMPORTED_LOCATION               "${slang_SOURCE_DIR}/lib/libslang.so"
+            )
+            target_link_libraries(slang::slang PUBLIC INTERFACE "${slang_SOURCE_DIR}/lib/libslang.so")
+        endif()
+    endif()
 endif()
 
 # Us
@@ -168,7 +211,11 @@ else()
 endif()
 
 include_directories(${${CMAKE_CURRENT_SOURCE_DIR}}/include)
-add_library(${PROJECT_NAME} STATIC ${SOURCES} ${HEADERS})
+if(BUILD_SHARED_LIBS)
+    add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
+else()
+    add_library(${PROJECT_NAME} STATIC ${SOURCES} ${HEADERS})
+endif()
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 target_include_directories(${PROJECT_NAME}
     PUBLIC
@@ -237,9 +284,14 @@ else() # RGFW
     endif()
 endif()
 
-target_compile_definitions(${PROJECT_NAME}
-    PRIVATE ${COMPILE_DEFINITIONS} ${BACKEND_DEFINES}
-    PUBLIC RAFX_STATIC
+if(BUILD_SHARED_LIBS)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE RAFX_EXPORTS)
+else()
+    target_compile_definitions(${PROJECT_NAME} PUBLIC RAFX_STATIC)
+endif()
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+    ${COMPILE_DEFINITIONS}
+    ${BACKEND_DEFINES}
 )
 target_compile_options(${PROJECT_NAME} PRIVATE ${COMPILE_OPTIONS})
 set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "${PROJECT_NAME}")

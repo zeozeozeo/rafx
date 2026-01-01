@@ -93,11 +93,3 @@ int main() {
     return 0;
 }
 ```
-
-## Note on upscalers
-
-To have them work, you must obtain the DLLs and make sure your backend of choice supports them.
-
-- For DLSS: You can get `nvngx_dlss.dll` from [TechPowerUp](https://www.techpowerup.com/download/nvidia-dlss-dll/) (unofficial) or the limited demo release in the [DLSS sdk repo](https://github.com/NVIDIA/DLSS/releases). Another option is to get it from the official Unreal Engine extension files.
-- For XeSS: You can get `libxess.dll` from the [XeSS repo](https://github.com/intel/xess/releases). Note that XeSS only works on the D3D12 backend (TODO?).
-- For FidelityFX: You can get them from the official [GPUOpen](https://gpuopen.com/amd-fsr-sdk/) page. (TODO: did not test)
