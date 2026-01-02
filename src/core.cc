@@ -452,15 +452,15 @@ bool rfxIsKeyReleased(RfxKey key) {
 }
 
 bool rfxIsMouseButtonDown(RfxMouseButton button) {
-    return (button >= 0 && button < 8) ? CORE.Input.mouseButtonsCurrent[button] : false;
+    return (button < 8) ? CORE.Input.mouseButtonsCurrent[button] : false;
 }
 
 bool rfxIsMouseButtonPressed(RfxMouseButton button) {
-    return (button >= 0 && button < 8) ? (CORE.Input.mouseButtonsCurrent[button] && !CORE.Input.mouseButtonsPrev[button]) : false;
+    return (button < 8) ? (CORE.Input.mouseButtonsCurrent[button] && !CORE.Input.mouseButtonsPrev[button]) : false;
 }
 
 bool rfxIsMouseButtonReleased(RfxMouseButton button) {
-    return (button >= 0 && button < 8) ? (!CORE.Input.mouseButtonsCurrent[button] && CORE.Input.mouseButtonsPrev[button]) : false;
+    return (button < 8) ? (!CORE.Input.mouseButtonsCurrent[button] && CORE.Input.mouseButtonsPrev[button]) : false;
 }
 
 void rfxGetMousePos(float* x, float* y) {
