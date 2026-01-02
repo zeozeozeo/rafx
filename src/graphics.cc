@@ -3,9 +3,9 @@
 #include <vector>
 #include <map>
 #include <string>
-#include <string.h>
-#include <assert.h>
-#include <stdio.h>
+#include <cstring>
+#include <cassert>
+#include <cstdio>
 #include <source_location>
 
 #include <NRD.h>
@@ -1974,7 +1974,9 @@ static const char* s_RafxSlangContent = R"(#ifndef RAFX_SLANG_H
     ByteAddressBuffer g_Buffers[RFX_MAX_BINDLESS_TEXTURES] : register(t4096, space1);
     RWByteAddressBuffer g_RWBuffers[RFX_MAX_BINDLESS_TEXTURES] : register(u0, space1);
     RWTexture2D<float4> g_RWTextures[RFX_MAX_BINDLESS_TEXTURES] : register(u4096, space1);
+#ifdef RFX_RAY_TRACING_SUPPORTED
     RaytracingAccelerationStructure g_AccelerationStructures[2048] : register(t8192, space1);
+#endif
 
     #define RFX_PUSH_CONSTANTS(StructName, Name) \
         [[vk::push_constant]] cbuffer Name##_RootConstants : register(b0, space0) { StructName Name; }
@@ -1986,7 +1988,9 @@ static const char* s_RafxSlangContent = R"(#ifndef RAFX_SLANG_H
     [[vk::binding(2, 1)]] ByteAddressBuffer g_Buffers[RFX_MAX_BINDLESS_TEXTURES];
     [[vk::binding(3, 1)]] RWByteAddressBuffer g_RWBuffers[RFX_MAX_BINDLESS_TEXTURES];
     [[vk::binding(4, 1)]] RWTexture2D<float4> g_RWTextures[RFX_MAX_BINDLESS_TEXTURES];
+#ifdef RFX_RAY_TRACING_SUPPORTED
     [[vk::binding(5, 1)]] RaytracingAccelerationStructure g_AccelerationStructures[2048];
+#endif
 
     #define RFX_PUSH_CONSTANTS(StructName, Name) \
         [[vk::push_constant]] StructName Name
@@ -1997,7 +2001,9 @@ Texture2D GetTexture(uint id) { return g_Textures[id]; }
 ByteAddressBuffer GetBuffer(uint id) { return g_Buffers[id]; }
 RWByteAddressBuffer GetRWBuffer(uint id) { return g_RWBuffers[id]; }
 RWTexture2D<float4> GetRWTexture(uint id) { return g_RWTextures[id]; }
+#ifdef RFX_RAY_TRACING_SUPPORTED
 RaytracingAccelerationStructure GetAccelerationStructure(uint id) { return g_AccelerationStructures[id]; }
+#endif
 
 SamplerState GetSamplerLinearClamp() { return g_Samplers[0]; }
 SamplerState GetSamplerLinearWrap() { return g_Samplers[1]; }
@@ -2144,6 +2150,7 @@ static RfxShader CompileShaderInternal(
 
     nri::GraphicsAPI graphicsAPI = CORE.NRI.GetDeviceDesc(*CORE.NRIDevice).graphicsAPI;
     bool isD3D12 = (graphicsAPI == nri::GraphicsAPI::D3D12);
+    bool hasRT = (CORE.FeatureSupportFlags & RFX_FEATURE_RAY_TRACING) != 0;
 
     // setup compiler session
     std::vector<slang::CompilerOptionEntry> sessionOpts;
@@ -2163,6 +2170,9 @@ static RfxShader CompileShaderInternal(
         prepMacros.push_back({ "RFX_BACKEND_D3D12", "1" });
     else
         prepMacros.push_back({ "RFX_BACKEND_SPIRV", "1" });
+
+    if (hasRT)
+        prepMacros.push_back({ "RFX_RAY_TRACING_SUPPORTED", "1" });
 
     char maxBindlessStr[32];
     snprintf(maxBindlessStr, sizeof(maxBindlessStr), "%d", RFX_MAX_BINDLESS_TEXTURES);
@@ -2371,11 +2381,16 @@ static RfxShader CompileShaderInternal(
     bindlessRanges[4] = { isD3D12 ? RFX_MAX_BINDLESS_TEXTURES : 4u, RFX_MAX_BINDLESS_TEXTURES, nri::DescriptorType::STORAGE_TEXTURE,
                           nri::StageBits::ALL, bindlessFlags };
 
-    // 5 = AS
-    bindlessRanges[5] = { isD3D12 ? (RFX_MAX_BINDLESS_TEXTURES * 2) : 5u, 2048, nri::DescriptorType::ACCELERATION_STRUCTURE,
-                          nri::StageBits::ALL, bindlessFlags };
+    uint32_t bindlessRangeCount = 5;
 
-    allSets.push_back({ 1, bindlessRanges, 6, nri::DescriptorSetBits::ALLOW_UPDATE_AFTER_SET });
+    if (hasRT) {
+        // 5 = AS
+        bindlessRanges[5] = { isD3D12 ? (RFX_MAX_BINDLESS_TEXTURES * 2) : 5u, 2048, nri::DescriptorType::ACCELERATION_STRUCTURE,
+                              nri::StageBits::ALL, bindlessFlags };
+        bindlessRangeCount = 6;
+    }
+
+    allSets.push_back({ 1, bindlessRanges, bindlessRangeCount, nri::DescriptorSetBits::ALLOW_UPDATE_AFTER_SET });
 
     impl->bindlessSetIndex = (uint32_t)allSets.size() - 1;
     impl->descriptorSetCount = (uint32_t)allSets.size();
@@ -2408,7 +2423,7 @@ static RfxShader CompileShaderInternal(
         }
 
         if (SLANG_FAILED(res) || !code) {
-            fprintf(stderr, "Error: Failed to generate bytecode for entry point %llu.\n", i);
+            fprintf(stderr, "Error: Failed to generate bytecode for entry point %llu.\n", (unsigned long long)i);
             if (isD3D12)
                 fprintf(stderr, "Hint: Ensure dxcompiler.dll and dxil.dll are present.\n");
             continue;

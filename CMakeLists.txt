@@ -97,8 +97,9 @@ if(TARGET NRD AND WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         list(REMOVE_ITEM _nrd_interface_opts "-fPIC")
         set_target_properties(NRD PROPERTIES INTERFACE_COMPILE_OPTIONS "${_nrd_interface_opts}")
     endif()
+endif()
 
-    # nvidia please test your code on all compilers
+if(TARGET NRD AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(NRD PRIVATE -Wno-unused-parameter)
 endif()
 

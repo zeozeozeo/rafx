@@ -71,7 +71,7 @@ void GenerateBrickTexture(uint8_t* p, int w, int h) {
             if (px < M || py < M)
                 a = r, c = g, d = b;
             else {
-                float v = R + (float)rand() / RAND_MAX * 2 * V - V, n = (float)rand() / RAND_MAX * .1 - .05;
+                float v = R + (float)((double)rand() / (double)RAND_MAX * 2.0 * V - V), n = (float)((double)rand() / (double)RAND_MAX * 0.1 - 0.05);
                 a = v + n;
                 c = G + v - R + n;
                 d = B + v - R + n;
@@ -105,7 +105,7 @@ void GenerateWoodTexture(uint8_t* p, int w, int h) {
     for (int y = 0; y < h; ++y)
         for (int x = 0; x < w; ++x) {
             float d = sqrtf(powf(x - w / 2.0f, 2) + powf((y - h / 2.0f) * 0.3f, 2));
-            float v = sinf(d * 0.15f) * 0.5f + 0.5f, n = (float)rand() / RAND_MAX * N;
+            float v = sinf(d * 0.15f) * 0.5f + 0.5f, n = (float)rand() / (double)RAND_MAX * N;
             int k = (y * w + x) * 4;
             p[k] = fmin(255, (R + v * .2f + n) * 255);
             p[k + 1] = fmin(255, (G + v * .15f + n) * 255);

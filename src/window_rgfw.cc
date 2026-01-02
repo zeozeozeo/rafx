@@ -262,7 +262,7 @@ void Backend_GetNativeHandles(nri::Window& nriWindow) {
     nriWindow.wayland.surface = RGFW_window_getWindow_Wayland(win);
 #elif (RAFX_PLATFORM == RAFX_X11)
     nriWindow.x11.dpy = RGFW_getDisplay_X11();
-    nriWindow.x11.window = (void*)RGFW_window_getWindow_X11(win);
+    nriWindow.x11.window = (uint64_t)(uintptr_t)RGFW_window_getWindow_X11(win);
 #elif (RAFX_PLATFORM == RAFX_COCOA)
     nriWindow.metal.caMetalLayer = RGFW_getLayer_OSX();
 #endif

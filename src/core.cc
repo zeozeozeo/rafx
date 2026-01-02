@@ -1,11 +1,10 @@
 #include "rafx.h"
 #include "rafx_internal.h"
-#include <assert.h>
+#include <cassert>
+#include <cstring>
 
 #if (RAFX_PLATFORM == RAFX_WINDOWS)
 #    include <windows.h>
-#else
-#    include <signal.h>
 #endif
 
 CoreData CORE = {};
@@ -146,6 +145,8 @@ static void CreateStaticSamplers() {
 static void InitBindless() {
     CreateStaticSamplers();
 
+    bool hasRT = (CORE.FeatureSupportFlags & RFX_FEATURE_RAY_TRACING) != 0;
+
     nri::DescriptorPoolDesc poolDesc = {};
     poolDesc.descriptorSetMaxNum = 1;
     poolDesc.textureMaxNum = RFX_MAX_BINDLESS_TEXTURES;
@@ -153,7 +154,7 @@ static void InitBindless() {
     poolDesc.storageStructuredBufferMaxNum = RFX_MAX_BINDLESS_TEXTURES;
     poolDesc.storageTextureMaxNum = RFX_MAX_BINDLESS_TEXTURES;
     poolDesc.samplerMaxNum = 4;
-    poolDesc.accelerationStructureMaxNum = 2048;
+    poolDesc.accelerationStructureMaxNum = hasRT ? 2048 : 0;
     poolDesc.flags = nri::DescriptorPoolBits::ALLOW_UPDATE_AFTER_SET;
     NRI_CHECK(CORE.NRI.CreateDescriptorPool(*CORE.NRIDevice, poolDesc, CORE.Bindless.descriptorPool));
 
@@ -182,14 +183,18 @@ static void InitBindless() {
     ranges[4] = { isD3D12 ? RFX_MAX_BINDLESS_TEXTURES : 4u, RFX_MAX_BINDLESS_TEXTURES, nri::DescriptorType::STORAGE_TEXTURE,
                   nri::StageBits::ALL, bindlessFlags };
 
-    // 5 = acceleration structures srv
-    ranges[5] = { isD3D12 ? (RFX_MAX_BINDLESS_TEXTURES * 2) : 5u, 2048, nri::DescriptorType::ACCELERATION_STRUCTURE, nri::StageBits::ALL,
-                  bindlessFlags };
+    uint32_t rangeCount = 5;
+    if (hasRT) {
+        // 5 = acceleration structures srv
+        ranges[5] = { isD3D12 ? (RFX_MAX_BINDLESS_TEXTURES * 2) : 5u, 2048, nri::DescriptorType::ACCELERATION_STRUCTURE, nri::StageBits::ALL,
+                        bindlessFlags };
+        rangeCount = 6;
+    }
 
     nri::DescriptorSetDesc setDesc = {};
     setDesc.registerSpace = 1;
     setDesc.ranges = ranges;
-    setDesc.rangeNum = 6;
+    setDesc.rangeNum = rangeCount;
     setDesc.flags = nri::DescriptorSetBits::ALLOW_UPDATE_AFTER_SET;
 
     nri::PipelineLayoutDesc layoutDesc = {};
