@@ -178,10 +178,6 @@ class OdinGenerator:
                         self.emit(f"{vname} = {idx},", 1)
                 self.emit("}")
                 self.emit(f"{name} :: bit_set[{flag_name}; {bit_type}]")
-
-                all_vals = ", ".join([f".{x}" for x in flag_values])
-                all_const = self.to_screaming_snake_case(name) + "_ALL"
-                self.emit(f"{all_const} :: {name}{{ {all_vals} }}")
                 self.emit()
             else:
                 underlying = "u32"

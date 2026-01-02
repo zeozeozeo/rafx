@@ -51,7 +51,6 @@ BufferUsageFlag :: enum u32 {
 	TransferDst = 11,
 }
 BufferUsageFlags :: bit_set[BufferUsageFlag; u32]
-BUFFER_USAGE_FLAGS_ALL :: BufferUsageFlags{ .ShaderResource, .ShaderResourceStorage, .VertexBuffer, .IndexBuffer, .ConstantBuffer, .ArgumentBuffer, .ScratchBuffer, .ShaderBindingTable, .AccelerationStructureBuildInput, .MicromapBuildInput, .TransferSrc, .TransferDst }
 
 ResourceState :: enum u32 {
 	Undefined = 0,
@@ -254,7 +253,6 @@ UpscaleDispatchFlag :: enum u32 {
 	UseSpecularMotion = 1,
 }
 UpscaleDispatchFlags :: bit_set[UpscaleDispatchFlag; u32]
-UPSCALE_DISPATCH_FLAGS_ALL :: UpscaleDispatchFlags{ .ResetHistory, .UseSpecularMotion }
 
 IndexType :: enum u32 {
 	Uint16 = 0,
@@ -273,7 +271,6 @@ BuildASFlag :: enum u32 {
 	AllowCompaction = 3,
 }
 BuildASFlags :: bit_set[BuildASFlag; u32]
-BUILD_AS_FLAGS_ALL :: BuildASFlags{ .PreferFastTrace, .PreferFastBuild, .AllowUpdate, .AllowCompaction }
 
 InstanceFlag :: enum u32 {
 	TriangleCullDisable = 0,
@@ -282,7 +279,6 @@ InstanceFlag :: enum u32 {
 	ForceNonOpaque = 3,
 }
 InstanceFlags :: bit_set[InstanceFlag; u32]
-INSTANCE_FLAGS_ALL :: InstanceFlags{ .TriangleCullDisable, .TriangleFlipFacing, .ForceOpaque, .ForceNonOpaque }
 
 RayTracingPipelineFlag :: enum u32 {
 	SkipTriangles = 0,
@@ -290,7 +286,6 @@ RayTracingPipelineFlag :: enum u32 {
 	AllowMicromaps = 2,
 }
 RayTracingPipelineFlags :: bit_set[RayTracingPipelineFlag; u32]
-RAY_TRACING_PIPELINE_FLAGS_ALL :: RayTracingPipelineFlags{ .SkipTriangles, .SkipAabbs, .AllowMicromaps }
 
 ShaderGroupType :: enum u32 {
 	General = 0,
@@ -305,7 +300,6 @@ TextureUsageFlag :: enum u32 {
 	Storage = 3,
 }
 TextureUsageFlags :: bit_set[TextureUsageFlag; u32]
-TEXTURE_USAGE_FLAGS_ALL :: TextureUsageFlags{ .ShaderResource, .RenderTarget, .DepthStencil, .Storage }
 
 MicromapFormat :: enum u32 {
 	V2State = 1,
@@ -318,7 +312,6 @@ BuildMicromapFlag :: enum u32 {
 	AllowCompaction = 2,
 }
 BuildMicromapFlags :: bit_set[BuildMicromapFlag; u32]
-BUILD_MICROMAP_FLAGS_ALL :: BuildMicromapFlags{ .PreferFastTrace, .PreferFastBuild, .AllowCompaction }
 
 UpscalerType :: enum u32 {
 	Nis = 0,
@@ -347,7 +340,6 @@ UpscalerFlag :: enum u32 {
 	MvJittered = 6,
 }
 UpscalerFlags :: bit_set[UpscalerFlag; u32]
-UPSCALER_FLAGS_ALL :: UpscalerFlags{ .Hdr, .Srgb, .DepthInverted, .DepthInfinite, .DepthLinear, .MvUpscaled, .MvJittered }
 
 Backend :: enum u32 {
 	Default = 0,
@@ -402,7 +394,6 @@ WindowFlag :: enum u32 {
 	ScaleToMonitor = 10,
 }
 WindowFlags :: bit_set[WindowFlag; u32]
-WINDOW_FLAGS_ALL :: WindowFlags{ .Vsync, .Fullscreen, .Borderless, .AlwaysActive, .NoResize, .Transparent, .Floating, .Maximized, .Hidden, .Centered, .ScaleToMonitor }
 
 FeatureSupportFlag :: enum u32 {
 	MeshShader = 0,
@@ -411,7 +402,6 @@ FeatureSupportFlag :: enum u32 {
 	LowLatency = 3,
 }
 FeatureSupportFlags :: bit_set[FeatureSupportFlag; u32]
-FEATURE_SUPPORT_FLAGS_ALL :: FeatureSupportFlags{ .MeshShader, .RayTracing, .Upscale, .LowLatency }
 
 CursorType :: enum u32 {
 	Default = 0,
