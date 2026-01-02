@@ -1069,8 +1069,8 @@ RAFX_API void rfxCmdTransitionTexture(RfxCommandList cmd, RfxTexture texture, Rf
 //
 
 // GPU Profiler, CPU markers
-RAFX_API void rfxBeginEvent(const char* name);
-RAFX_API void rfxEndEvent();
+RAFX_API void rfxBeginMarker(const char* name);
+RAFX_API void rfxEndMarker();
 RAFX_API void rfxMarker(const char* name);
 RAFX_API void rfxCmdBeginEvent(RfxCommandList cmd, const char* name);
 RAFX_API void rfxCmdEndEvent(RfxCommandList cmd);
@@ -1147,7 +1147,7 @@ RAFX_API void
 rfxCmdBuildAccelerationStructure(RfxCommandList cmd, RfxAccelerationStructure dst, RfxBuffer scratch, RfxBuffer instanceBuffer);
 RAFX_API void rfxCmdUploadInstances(RfxCommandList cmd, RfxBuffer dstBuffer, const RfxInstance* instances, uint32_t instanceCount);
 RAFX_API void rfxCmdTraceRays(RfxCommandList cmd, const RfxTraceRaysDesc* desc, uint32_t width, uint32_t height, uint32_t depth);
-RAFX_API void rfxCmdDispatchRaysIndirect(RfxCommandList cmd, const RfxTraceRaysDesc* desc, RfxBuffer argsBuffer, uint64_t argsOffset);
+RAFX_API void rfxCmdDispatchRaysIndirect(RfxCommandList cmd, RfxBuffer argsBuffer, uint64_t argsOffset);
 
 RAFX_API RfxMicromap rfxCreateMicromap(const RfxMicromapDesc* desc);
 RAFX_API void rfxDestroyMicromap(RfxMicromap micromap);

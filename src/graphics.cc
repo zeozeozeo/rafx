@@ -2980,7 +2980,7 @@ void rfxCmdMarker(RfxCommandList cmd, const char* name) {
     CORE.NRI.CmdAnnotation(*cmd->nriCmd, name, 0);
 }
 
-void rfxBeginEvent(const char* name) {
+void rfxBeginMarker(const char* name) {
     nri::nriBeginAnnotation(name, 0);
 }
 

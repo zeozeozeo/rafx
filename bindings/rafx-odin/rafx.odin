@@ -1040,10 +1040,10 @@ foreign lib {
 	cmd_transition_buffer :: proc(cmd: CommandList, buffer: Buffer, state: ResourceState) ---
 	@(link_name="rfxCmdTransitionTexture")
 	cmd_transition_texture :: proc(cmd: CommandList, texture: Texture, state: ResourceState) ---
-	@(link_name="rfxBeginEvent")
-	begin_event :: proc(name: cstring) ---
-	@(link_name="rfxEndEvent")
-	end_event :: proc() ---
+	@(link_name="rfxBeginMarker")
+	begin_marker :: proc(name: cstring) ---
+	@(link_name="rfxEndMarker")
+	end_marker :: proc() ---
 	@(link_name="rfxMarker")
 	marker :: proc(name: cstring) ---
 	@(link_name="rfxCmdBeginEvent")
@@ -1113,7 +1113,7 @@ foreign lib {
 	@(link_name="rfxCmdTraceRays")
 	cmd_trace_rays :: proc(cmd: CommandList, desc: ^TraceRaysDesc, width: u32, height: u32, depth: u32) ---
 	@(link_name="rfxCmdDispatchRaysIndirect")
-	cmd_dispatch_rays_indirect :: proc(cmd: CommandList, desc: ^TraceRaysDesc, args_buffer: Buffer, args_offset: u64) ---
+	cmd_dispatch_rays_indirect :: proc(cmd: CommandList, args_buffer: Buffer, args_offset: u64) ---
 	@(link_name="rfxCreateMicromap")
 	create_micromap :: proc(desc: ^MicromapDesc) -> Micromap ---
 	@(link_name="rfxDestroyMicromap")

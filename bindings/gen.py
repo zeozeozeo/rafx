@@ -3,6 +3,7 @@ import os
 import subprocess
 import sys
 
+import gen_jai
 import gen_odin
 import gen_rs
 from gen_ast import ClangAstParser
@@ -10,6 +11,7 @@ from gen_ast import ClangAstParser
 GENERATORS = {
     "rust": gen_rs.RustGenerator,
     "odin": gen_odin.OdinGenerator,
+    "jai": gen_jai.JaiGenerator,
 }
 
 
@@ -101,6 +103,16 @@ def handle_odin_output(output_path, content):
     print(f"Generated: {file_path}")
 
 
+def handle_jai_output(output_path, content):
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
+    file_path = os.path.join(output_path, "rafx.jai")
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"Generated: {file_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="FFI Binding Generator")
     parser.add_argument("header", help="Path to the C header file")
@@ -136,6 +148,8 @@ def main():
         handle_rust_output(args.output, generated_code)
     elif args.lang == "odin":
         handle_odin_output(args.output, generated_code)
+    elif args.lang == "jai":
+        handle_jai_output(args.output, generated_code)
     else:
         print(generated_code)
 

@@ -1424,8 +1424,8 @@ pub mod sys {
             texture: RfxTexture,
             state: RfxResourceState,
         );
-        pub fn rfxBeginEvent(name: *const c_char);
-        pub fn rfxEndEvent();
+        pub fn rfxBeginMarker(name: *const c_char);
+        pub fn rfxEndMarker();
         pub fn rfxMarker(name: *const c_char);
         pub fn rfxCmdBeginEvent(cmd: RfxCommandList, name: *const c_char);
         pub fn rfxCmdEndEvent(cmd: RfxCommandList);
@@ -1499,7 +1499,6 @@ pub mod sys {
         );
         pub fn rfxCmdDispatchRaysIndirect(
             cmd: RfxCommandList,
-            desc: *const RfxTraceRaysDesc,
             argsBuffer: RfxBuffer,
             argsOffset: u64,
         );
@@ -3276,20 +3275,8 @@ impl CommandList {
             )
         }
     }
-    pub fn dispatch_rays_indirect(
-        &self,
-        desc: *mut TraceRaysDesc,
-        args_buffer: Buffer,
-        args_offset: u64,
-    ) {
-        unsafe {
-            sys::rfxCmdDispatchRaysIndirect(
-                self.0,
-                desc as *mut sys::RfxTraceRaysDesc,
-                args_buffer.0,
-                args_offset,
-            )
-        }
+    pub fn dispatch_rays_indirect(&self, args_buffer: Buffer, args_offset: u64) {
+        unsafe { sys::rfxCmdDispatchRaysIndirect(self.0, args_buffer.0, args_offset) }
     }
     pub fn build_micromaps(&self, desc: *mut BuildMicromapDesc) {
         unsafe { sys::rfxCmdBuildMicromaps(self.0, desc as *mut sys::RfxBuildMicromapDesc) }
@@ -3583,11 +3570,11 @@ pub fn end_frame() {
 pub fn create_fence(initial_value: u64) -> Fence {
     Fence(unsafe { sys::rfxCreateFence(initial_value) })
 }
-pub fn begin_event(name: &str) {
-    unsafe { sys::rfxBeginEvent(std::ffi::CString::new(name).unwrap().as_ptr()) }
+pub fn begin_marker(name: &str) {
+    unsafe { sys::rfxBeginMarker(std::ffi::CString::new(name).unwrap().as_ptr()) }
 }
-pub fn end_event() {
-    unsafe { sys::rfxEndEvent() }
+pub fn end_marker() {
+    unsafe { sys::rfxEndMarker() }
 }
 pub fn marker(name: &str) {
     unsafe { sys::rfxMarker(std::ffi::CString::new(name).unwrap().as_ptr()) }
