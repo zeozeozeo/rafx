@@ -211,7 +211,7 @@ static void GetNRIState(RfxResourceState state, nri::AccessBits& access, nri::La
     case RFX_STATE_UNDEFINED:
         access = nri::AccessBits::NONE;
         layout = nri::Layout::UNDEFINED;
-        stage = nri::StageBits::ALL_SHADERS;
+        stage = nri::StageBits::ALL;
         break;
     case RFX_STATE_PRESENT:
         access = nri::AccessBits::NONE;
@@ -243,12 +243,12 @@ static void GetNRIState(RfxResourceState state, nri::AccessBits& access, nri::La
     case RFX_STATE_SHADER_READ:
         access = nri::AccessBits::SHADER_RESOURCE;
         layout = nri::Layout::SHADER_RESOURCE;
-        stage = nri::StageBits::ALL_SHADERS;
+        stage = nri::StageBits::ALL;
         break;
     case RFX_STATE_SHADER_WRITE:
         access = nri::AccessBits::SHADER_RESOURCE_STORAGE;
         layout = nri::Layout::SHADER_RESOURCE_STORAGE;
-        stage = nri::StageBits::ALL_SHADERS;
+        stage = nri::StageBits::ALL;
         break;
     case RFX_STATE_RENDER_TARGET:
         access = nri::AccessBits::COLOR_ATTACHMENT;
@@ -1693,12 +1693,12 @@ RfxBuffer rfxCreateBuffer(size_t size, size_t stride, RfxBufferUsageFlags usage,
             CORE.NRI.UnmapBuffer(*impl->buffer);
 
             impl->currentAccess = nri::AccessBits::SHADER_RESOURCE;
-            impl->currentStage = nri::StageBits::ALL_SHADERS;
+            impl->currentStage = nri::StageBits::ALL;
             impl->currentState = RFX_STATE_SHADER_READ;
         }
     } else {
         impl->currentAccess = nri::AccessBits::SHADER_RESOURCE;
-        impl->currentStage = nri::StageBits::ALL_SHADERS;
+        impl->currentStage = nri::StageBits::ALL;
         impl->currentState = RFX_STATE_SHADER_READ;
     }
 
@@ -2733,7 +2733,7 @@ void rfxCmdTransitionBuffer(RfxCommandList cmd, RfxBuffer buffer, RfxResourceSta
     if (state == RFX_STATE_SHADER_WRITE && buffer->currentState == RFX_STATE_SHADER_WRITE) {
         nri::BufferBarrierDesc d = {};
         d.buffer = buffer->buffer;
-        d.before = { nri::AccessBits::SHADER_RESOURCE_STORAGE, nri::StageBits::ALL_SHADERS };
+        d.before = { nri::AccessBits::SHADER_RESOURCE_STORAGE, nri::StageBits::ALL };
         d.after = d.before;
         cmd->barriers.bufferBarriers.push_back(d);
         return;
@@ -3788,14 +3788,14 @@ void rfxSubmitCommandListAsync(
     for (uint32_t i = 0; i < waitCount; ++i) {
         waits[i].fence = waitFences[i]->fence;
         waits[i].value = waitValues[i];
-        waits[i].stages = nri::StageBits::ALL_SHADERS;
+        waits[i].stages = nri::StageBits::ALL;
     }
 
     std::vector<nri::FenceSubmitDesc> signals(signalCount);
     for (uint32_t i = 0; i < signalCount; ++i) {
         signals[i].fence = signalFences[i]->fence;
         signals[i].value = signalValues[i];
-        signals[i].stages = nri::StageBits::ALL_SHADERS;
+        signals[i].stages = nri::StageBits::ALL;
         signalFences[i]->value = signalValues[i];
     }
 
