@@ -3,7 +3,7 @@
 if [ ! -d "build" ]; then
     mkdir build
     cd build
-    cmake .. -GNinja -DCMAKE_BUILD_TYPE=Debug -DRAFX_BUILD_EXAMPLES=ON -DDRAFX_USE_WAYLAND=ON
+    cmake .. -GNinja -DCMAKE_BUILD_TYPE=Debug -DRAFX_BUILD_EXAMPLES=ON -DRAFX_USE_WAYLAND=ON
     cd ..
 fi
 
