@@ -881,6 +881,7 @@ destroy_sampler :: (sampler: Sampler) #foreign librafx "rfxDestroySampler";
 compile_shader :: (filepath: *u8, defines: *u8, num_defines: s32, include_dirs: *u8, num_include_dirs: s32) -> Shader #foreign librafx "rfxCompileShader";
 compile_shader_mem :: (source: *u8, defines: *u8, num_defines: s32, include_dirs: *u8, num_include_dirs: s32) -> Shader #foreign librafx "rfxCompileShaderMem";
 destroy_shader :: (shader: Shader) #foreign librafx "rfxDestroyShader";
+watch_shader :: (shader: Shader, watch: bool) #foreign librafx "rfxWatchShader";
 create_pipeline :: (desc: *PipelineDesc) -> Pipeline #foreign librafx "rfxCreatePipeline";
 destroy_pipeline :: (pipeline: Pipeline) #foreign librafx "rfxDestroyPipeline";
 create_compute_pipeline :: (desc: *ComputePipelineDesc) -> Pipeline #foreign librafx "rfxCreateComputePipeline";

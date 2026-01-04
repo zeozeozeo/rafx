@@ -926,6 +926,8 @@ foreign lib {
 	compile_shader_mem :: proc(source: cstring, defines: cstring, num_defines: i32, include_dirs: cstring, num_include_dirs: i32) -> Shader ---
 	@(link_name="rfxDestroyShader")
 	destroy_shader :: proc(shader: Shader) ---
+	@(link_name="rfxWatchShader")
+	watch_shader :: proc(shader: Shader, watch: bool) ---
 	@(link_name="rfxCreatePipeline")
 	create_pipeline :: proc(desc: ^PipelineDesc) -> Pipeline ---
 	@(link_name="rfxDestroyPipeline")

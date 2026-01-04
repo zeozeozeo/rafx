@@ -9,14 +9,14 @@ It is based on the [NVIDIA Render Interface (NRI)](https://github.com/NVIDIA-RTX
 - Fully bindless rendering approach (no CPU bindgroups, descriptor sets, ...)
 - Automatic tracking of resource states, barrier placement and transitions
 - Full parity between Vulkan, D3D12 and Metal (through MoltenVK/KosmicKrisp)
+- Support for [Enhanced Barriers](https://microsoft.github.io/DirectX-Specs/d3d/D3D12EnhancedBarriers.html) on DirectX 12 Ultimate
 - Built-in windowing (using [RGFW](http://github.com/ColleagueRiley/RGFW), GLFW or SDL3), fully cross-platform
-- ImGui extension `rfxCmdDrawImGui`
 - Built-in support for [NRD](https://github.com/NVIDIA-RTX/NRD) denoisers (ReBLUR, ReLAX, Sigma) `rfxCmdDenoise`
 - Native integration with the [Slang](https://shader-slang.org/) shader language
 - Graphics, compute, raytracing and mesh shaders
 - Support for hardware RT and opacity micromaps
 - Support for common upscalers (NVIDIA DLSS, AMD FSR, Intel XeSS, NVIDIA DLSS Ray Reconstruction, NIS)
-- `printf` inside shaders
+- `printf` inside shaders, toggleable hot-reloading `rfxWatchShader`
 - Suitable for tile-based rendering architectures
 - Tight integration with AMD's Virtual Memory Allocator (VMA) for Vulkan and D3D12 for optimal memory reuse
 - Async compute (parallel execution of graphics and compute workloads)
@@ -26,6 +26,7 @@ It is based on the [NVIDIA Render Interface (NRI)](https://github.com/NVIDIA-RTX
 - Occlusion queries
 - Low latency support (aka NVIDIA Reflex)
 - GPU profiler, timeline annotations (GAPI, Nsight, PIX), resource naming
+- ImGui extension `rfxCmdDrawImGui`
 - Lots of [examples](./examples) to get you started
 
 ## Examples

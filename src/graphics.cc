@@ -968,227 +968,6 @@ static void RecreateSwapChain(int w, int h) {
     CORE.SwapChainHeight = h;
 }
 
-void rfxBeginFrame() {
-    bool wasSleeping = false;
-
-    // wait until swapchain is valid
-    while (true) {
-        bool hasExtent = (CORE.FramebufferWidth > 0 && CORE.FramebufferHeight > 0);
-        bool active = !CORE.IsMinimized && (CORE.IsFocused || (CORE.WindowFlags & RFX_WINDOW_ALWAYS_ACTIVE));
-
-        if (!hasExtent || !active) {
-            wasSleeping = true;
-            rfxEventSleep();
-            if (rfxWindowShouldClose())
-                return;
-            rfxPollInputEvents();
-            continue;
-        }
-        rfxPollInputEvents();
-        if (CORE.FramebufferWidth == 0 || CORE.FramebufferHeight == 0 || CORE.IsMinimized) {
-            continue;
-        }
-        break;
-    }
-
-    // time
-    double currentTime = rfxGetTime();
-    if (CORE.LastTime == 0.0 || wasSleeping)
-        CORE.LastTime = currentTime - 0.01666;
-
-    CORE.DeltaTime = (float)(currentTime - CORE.LastTime);
-    CORE.LastTime = currentTime;
-    if (CORE.DeltaTime <= 0.000001f)
-        CORE.DeltaTime = 0.000001f;
-
-    // recreate swapchain
-    int currentW = CORE.FramebufferWidth;
-    int currentH = CORE.FramebufferHeight;
-
-    if (currentW > 0 && currentH > 0 && ((uint32_t)currentW != CORE.SwapChainWidth || (uint32_t)currentH != CORE.SwapChainHeight)) {
-        RecreateSwapChain(currentW, currentH);
-    }
-
-    if (CORE.SwapChainWidth == 0 || CORE.SwapChainHeight == 0)
-        return;
-
-    if (CORE.FrameIndex >= GetQueuedFrameNum()) {
-        CORE.NRI.Wait(*CORE.NRIFrameFence, 1 + CORE.FrameIndex - GetQueuedFrameNum());
-
-        // process timestamps ...
-        uint32_t completedFrameIdx = (CORE.FrameIndex - GetQueuedFrameNum());
-        uint32_t qfIdx = completedFrameIdx % GetQueuedFrameNum();
-        QueuedFrame& oldQf = CORE.QueuedFrames[qfIdx];
-
-        if (oldQf.queryCount > 0) {
-            uint64_t* data = (uint64_t*)CORE.NRI.MapBuffer(*CORE.TimestampBuffer, 0, nri::WHOLE_SIZE);
-            if (data) {
-                uint64_t* frameData = data + (qfIdx * RFX_MAX_TIMESTAMP_QUERIES);
-                uint64_t freq = CORE.NRI.GetDeviceDesc(*CORE.NRIDevice).other.timestampFrequencyHz;
-                double periodUs = 1e6 / (double)freq;
-
-                CORE.LastFrameTimestamps.clear();
-                for (const auto& reg : oldQf.profileRegions) {
-                    uint64_t t0 = frameData[reg.startIndex];
-                    uint64_t t1 = frameData[reg.endIndex];
-                    if (t1 >= t0) {
-                        float duration = (float)((t1 - t0) * periodUs);
-                        CORE.LastFrameTimestamps.push_back({ reg.name, duration });
-                    }
-                }
-                CORE.NRI.UnmapBuffer(*CORE.TimestampBuffer);
-            }
-        }
-    }
-
-    // process graveyard ...
-    uint32_t frameIdx = CORE.FrameIndex % GetQueuedFrameNum();
-    {
-        auto& q = CORE.Graveyard[frameIdx];
-        std::vector<std::function<void()>> readyTasks = std::move(q.tasks);
-        q.tasks.clear();
-
-        for (auto& task : readyTasks)
-            task();
-    }
-
-    // begin implicit commandbuffer
-    QueuedFrame& qf = CORE.QueuedFrames[frameIdx];
-    CORE.NRI.ResetCommandAllocator(*qf.commandAllocator);
-
-    qf.queryCount = 0;
-    qf.profileRegions.clear();
-    qf.profileStack.clear();
-
-    uint32_t semIdx = CORE.FrameIndex % (uint32_t)CORE.SwapChainTextures.size();
-    CORE.NRI.AcquireNextTexture(*CORE.NRISwapChain, *CORE.SwapChainTextures[semIdx].acquireSemaphore, CORE.CurrentSwapChainTextureIndex);
-
-    CORE.NRI.BeginCommandBuffer(*qf.commandBuffer, CORE.Bindless.descriptorPool);
-    CORE.NRI.CmdResetQueries(*qf.commandBuffer, *CORE.TimestampPool, frameIdx * RFX_MAX_TIMESTAMP_QUERIES, RFX_MAX_TIMESTAMP_QUERIES);
-
-    qf.wrapper.ResetCache();
-
-    // run init work ...
-    if (!CORE.PendingPreBarriers.empty() || !CORE.PendingPostBarriers.empty()) {
-        for (auto& work : CORE.PendingPreBarriers)
-            work(*qf.commandBuffer);
-        CORE.PendingPreBarriers.clear();
-
-        CORE.NRI.CmdCopyStreamedData(*qf.commandBuffer, *CORE.NRIStreamer);
-
-        for (auto& work : CORE.PendingPostBarriers)
-            work(*qf.commandBuffer);
-        CORE.PendingPostBarriers.clear();
-    }
-
-    qf.wrapper.isRendering = false;
-    qf.wrapper.currentPipeline = nullptr;
-    qf.wrapper.currentVertexBuffer = nullptr;
-    qf.wrapper.currentIndexBuffer = nullptr;
-    qf.wrapper.scissorSet = false;
-    qf.wrapper.activeColorAttachments.clear();
-    qf.wrapper.currentRenderingDesc = {};
-    qf.wrapper.activeColorTextures.clear();
-    qf.wrapper.activeDepthTexture = nullptr;
-    qf.wrapper.tempDescriptors.clear();
-    qf.wrapper.barriers.bufferBarriers.clear();
-    qf.wrapper.barriers.textureBarriers.clear();
-    qf.wrapper.barriers.globalBarriers.clear();
-
-    CORE.SwapChainWrapper.texture = CORE.SwapChainTextures[CORE.CurrentSwapChainTextureIndex].texture;
-    CORE.SwapChainWrapper.format = CORE.SwapChainTextures[CORE.CurrentSwapChainTextureIndex].attachmentFormat;
-    CORE.SwapChainWrapper.width = CORE.SwapChainWidth;
-    CORE.SwapChainWrapper.height = CORE.SwapChainHeight;
-    CORE.SwapChainWrapper.sampleCount = 1;
-    CORE.SwapChainWrapper.mipNum = 1;
-    CORE.SwapChainWrapper.layerNum = 1;
-    CORE.SwapChainWrapper.mipOffset = 0;
-    CORE.SwapChainWrapper.layerOffset = 0;
-
-    if (!CORE.SwapChainWrapper.state) {
-        CORE.SwapChainWrapper.state = new RfxTextureSharedState();
-        CORE.SwapChainWrapper.state->totalMips = 1;
-        CORE.SwapChainWrapper.state->totalLayers = 1;
-        CORE.SwapChainWrapper.state->subresourceStates.resize(1);
-    }
-
-    if (CORE.SwapChainTextures[CORE.CurrentSwapChainTextureIndex].initialized) {
-        CORE.SwapChainWrapper.state->Set(0, 0, RFX_STATE_PRESENT);
-    } else {
-        CORE.SwapChainWrapper.state->Set(0, 0, RFX_STATE_UNDEFINED);
-        CORE.SwapChainTextures[CORE.CurrentSwapChainTextureIndex].initialized = true;
-    }
-
-    CORE.FrameStarted = true;
-}
-
-void rfxEndFrame() {
-    if (!CORE.FrameStarted)
-        return;
-    CORE.FrameStarted = false;
-
-    if (CORE.AllowLowLatency && CORE.LowLatencyEnabled && CORE.NRISwapChain) {
-        CORE.NRI.SetLatencyMarker(*CORE.NRISwapChain, nri::LatencyMarker::SIMULATION_END);
-    }
-
-    uint32_t frameIdx = CORE.FrameIndex % GetQueuedFrameNum();
-    QueuedFrame& qf = CORE.QueuedFrames[frameIdx];
-    RfxCommandList cmd = &qf.wrapper;
-
-    if (cmd->isRendering)
-        CORE.NRI.CmdEndRendering(*qf.commandBuffer);
-
-    // swapchain->present
-    cmd->barriers.RequireState(&CORE.SwapChainWrapper, RFX_STATE_PRESENT);
-    cmd->barriers.Flush(*qf.commandBuffer);
-
-    if (qf.queryCount > 0) {
-        CORE.NRI.CmdCopyQueries(
-            *qf.commandBuffer, *CORE.TimestampPool, frameIdx * RFX_MAX_TIMESTAMP_QUERIES, qf.queryCount, *CORE.TimestampBuffer,
-            (frameIdx * RFX_MAX_TIMESTAMP_QUERIES) * sizeof(uint64_t)
-        );
-    }
-
-    CORE.NRI.EndCommandBuffer(*qf.commandBuffer);
-
-    if (CORE.AllowLowLatency && CORE.LowLatencyEnabled && CORE.NRISwapChain) {
-        CORE.NRI.SetLatencyMarker(*CORE.NRISwapChain, nri::LatencyMarker::RENDER_SUBMIT_START);
-    }
-
-    SwapChainTexture& sc = CORE.SwapChainTextures[CORE.CurrentSwapChainTextureIndex];
-    nri::FenceSubmitDesc wait = { CORE.SwapChainTextures[CORE.FrameIndex % CORE.SwapChainTextures.size()].acquireSemaphore, 0,
-                                  nri::StageBits::COLOR_ATTACHMENT };
-    nri::FenceSubmitDesc signal = { sc.releaseSemaphore, 0, nri::StageBits::NONE };
-    nri::QueueSubmitDesc submit = {};
-    submit.waitFences = &wait;
-    submit.waitFenceNum = 1;
-    submit.signalFences = &signal;
-    submit.signalFenceNum = 1;
-    submit.commandBuffers = &qf.commandBuffer;
-    submit.commandBufferNum = 1;
-
-    if (CORE.AllowLowLatency && CORE.LowLatencyEnabled) {
-        submit.swapChain = CORE.NRISwapChain;
-    }
-
-    CORE.NRI.QueueSubmit(*CORE.NRIGraphicsQueue, submit);
-
-    if (CORE.AllowLowLatency && CORE.LowLatencyEnabled && CORE.NRISwapChain) {
-        CORE.NRI.SetLatencyMarker(*CORE.NRISwapChain, nri::LatencyMarker::RENDER_SUBMIT_END);
-    }
-
-    CORE.NRI.QueuePresent(*CORE.NRISwapChain, *sc.releaseSemaphore);
-
-    nri::FenceSubmitDesc frameSig = { CORE.NRIFrameFence, 1 + CORE.FrameIndex, nri::StageBits::NONE };
-    nri::QueueSubmitDesc frameSub = {};
-    frameSub.signalFences = &frameSig;
-    frameSub.signalFenceNum = 1;
-    CORE.NRI.QueueSubmit(*CORE.NRIGraphicsQueue, frameSub);
-
-    CORE.NRI.EndStreamerFrame(*CORE.NRIStreamer);
-    CORE.FrameIndex++;
-}
-
 //
 // Commands
 //
@@ -2256,6 +2035,12 @@ static RfxShader CompileShaderInternal(
         return nullptr;
 
     RfxShaderImpl* impl = new RfxShaderImpl();
+    if (path)
+        impl->filepath = path;
+    for (int i = 0; i < numDefines; i++)
+        impl->defines.push_back(defines[i]);
+    for (int i = 0; i < numIncludeDirs; i++)
+        impl->includeDirs.push_back(includeDirs[i]);
     slang::ProgramLayout* layout = linkedProgram->getLayout();
     impl->stageMask = actualShaderStages;
 
@@ -2479,11 +2264,134 @@ void rfxDestroyShader(RfxShader shader) {
     });
 }
 
+void rfxWatchShader(RfxShader shader, bool watch) {
+    if (!shader)
+        return;
+    RfxShaderImpl* impl = (RfxShaderImpl*)shader;
+
+    if (!watch) {
+        impl->watcher.reset();
+        return;
+    }
+
+    if (impl->filepath.empty()) {
+        fprintf(stderr, "[Rafx] Warning: Cannot watch shader created from memory.\n");
+        return;
+    }
+
+    if (impl->watcher)
+        return;
+
+    std::filesystem::path shaderPath(impl->filepath);
+
+    std::error_code ec;
+    if (!std::filesystem::exists(shaderPath, ec)) {
+        shaderPath = std::filesystem::absolute(shaderPath, ec);
+    } else {
+        shaderPath = std::filesystem::canonical(shaderPath, ec);
+    }
+
+    std::filesystem::path watchDir = shaderPath.parent_path();
+    std::string targetFilename = shaderPath.filename().string();
+
+    auto callback = [impl, targetFilename](const wtr::event& e) {
+        if (e.path_type == wtr::event::path_type::watcher)
+            return;
+
+        bool shouldReload = false;
+
+        if (e.effect_type == wtr::event::effect_type::modify || e.effect_type == wtr::event::effect_type::create) {
+            if (e.path_name.filename().string() == targetFilename) {
+                shouldReload = true;
+            }
+        } else if (e.effect_type == wtr::event::effect_type::rename) {
+            // handle atomic saves (rename temp file -> target file)
+            if (e.associated && e.associated->path_name.filename().string() == targetFilename) {
+                shouldReload = true;
+            }
+        }
+
+        if (shouldReload) {
+            std::lock_guard<std::mutex> lock(CORE.HotReloadMutex);
+            CORE.ShadersToReload.insert((RfxShader)impl);
+        }
+    };
+
+    impl->watcher = std::make_unique<wtr::watch>(watchDir, callback);
+}
+
+static CachedGraphics CacheGraphicsDesc(const RfxPipelineDesc* src) {
+    CachedGraphics cache;
+    cache.desc = *src;
+    if (src->vsEntryPoint) {
+        cache.vsEntryStorage = src->vsEntryPoint;
+        cache.desc.vsEntryPoint = cache.vsEntryStorage.c_str();
+    }
+    if (src->psEntryPoint) {
+        cache.psEntryStorage = src->psEntryPoint;
+        cache.desc.psEntryPoint = cache.psEntryStorage.c_str();
+    }
+    if (src->attachmentCount > 0 && src->attachments) {
+        cache.attachmentStorage.assign(src->attachments, src->attachments + src->attachmentCount);
+        cache.desc.attachments = cache.attachmentStorage.data();
+    }
+    if (src->vertexLayoutCount > 0 && src->vertexLayout) {
+        cache.layoutStorage.assign(src->vertexLayout, src->vertexLayout + src->vertexLayoutCount);
+        cache.desc.vertexLayout = cache.layoutStorage.data();
+    }
+    return cache;
+}
+
+static CachedCompute CacheComputeDesc(const RfxComputePipelineDesc* src) {
+    CachedCompute cache;
+    cache.desc = *src;
+    if (src->entryPoint) {
+        cache.entryStorage = src->entryPoint;
+        cache.desc.entryPoint = cache.entryStorage.c_str();
+    }
+    return cache;
+}
+
+static CachedRT CacheRTDesc(const RfxRayTracingPipelineDesc* src) {
+    CachedRT cache;
+    cache.desc = *src;
+    if (src->groupCount > 0 && src->groups) {
+        cache.groupStorage.assign(src->groups, src->groups + src->groupCount);
+        for (auto& g : cache.groupStorage) {
+            if (g.generalShader) {
+                cache.nameStorage.push_back(g.generalShader);
+                g.generalShader = cache.nameStorage.back().c_str();
+            }
+            if (g.closestHitShader) {
+                cache.nameStorage.push_back(g.closestHitShader);
+                g.closestHitShader = cache.nameStorage.back().c_str();
+            }
+            if (g.anyHitShader) {
+                cache.nameStorage.push_back(g.anyHitShader);
+                g.anyHitShader = cache.nameStorage.back().c_str();
+            }
+            if (g.intersectionShader) {
+                cache.nameStorage.push_back(g.intersectionShader);
+                g.intersectionShader = cache.nameStorage.back().c_str();
+            }
+        }
+        cache.desc.groups = cache.groupStorage.data();
+    }
+    return cache;
+}
+
 RfxPipeline rfxCreatePipeline(const RfxPipelineDesc* desc) {
     RfxPipelineImpl* impl = new RfxPipelineImpl();
     impl->shader = desc->shader;
     impl->vertexStride = desc->vertexStride;
     impl->bindPoint = nri::BindPoint::GRAPHICS;
+
+    impl->type = RfxPipelineImpl::GRAPHICS;
+    impl->cache = CacheGraphicsDesc(desc);
+    {
+        std::lock_guard<std::mutex> lock(CORE.HotReloadMutex);
+        impl->shader->dependentPipelines.insert(impl);
+    }
 
     nri::GraphicsPipelineDesc gpd = {};
     gpd.pipelineLayout = impl->shader->pipelineLayout;
@@ -2648,6 +2556,14 @@ RfxPipeline rfxCreateComputePipeline(const RfxComputePipelineDesc* desc) {
     RfxPipelineImpl* impl = new RfxPipelineImpl();
     impl->shader = desc->shader;
     impl->bindPoint = nri::BindPoint::COMPUTE;
+
+    impl->type = RfxPipelineImpl::COMPUTE;
+    impl->cache = CacheComputeDesc(desc);
+    {
+        std::lock_guard<std::mutex> lock(CORE.HotReloadMutex);
+        impl->shader->dependentPipelines.insert(impl);
+    }
+
     nri::ComputePipelineDesc cpd = {};
     cpd.pipelineLayout = impl->shader->pipelineLayout;
     for (auto& s : impl->shader->stages) {
@@ -3232,6 +3148,13 @@ RfxPipeline rfxCreateRayTracingPipeline(const RfxRayTracingPipelineDesc* desc) {
     impl->shader = (RfxShaderImpl*)desc->shader;
     impl->bindPoint = nri::BindPoint::RAY_TRACING;
     impl->shaderGroupCount = desc->groupCount;
+
+    impl->type = RfxPipelineImpl::RAY_TRACING;
+    impl->cache = CacheRTDesc(desc);
+    {
+        std::lock_guard<std::mutex> lock(CORE.HotReloadMutex);
+        impl->shader->dependentPipelines.insert(impl);
+    }
 
     nri::StageBits rtMask = nri::StageBits::RAYGEN_SHADER | nri::StageBits::ANY_HIT_SHADER | nri::StageBits::CLOSEST_HIT_SHADER |
                             nri::StageBits::MISS_SHADER | nri::StageBits::INTERSECTION_SHADER | nri::StageBits::CALLABLE_SHADER;
@@ -4261,4 +4184,533 @@ void rfxCmdSetSampleLocations(RfxCommandList cmd, const RfxSampleLocation* locat
     CORE.NRI.CmdSetSampleLocations(
         *cmd->nriCmd, (const nri::SampleLocation*)locations, (nri::Sample_t)locationCount, (nri::Sample_t)sampleCount
     );
+}
+
+//
+// Frame
+//
+
+static void BuildNRIPipeline(RfxPipelineImpl* impl) {
+    if (impl->type == RfxPipelineImpl::GRAPHICS) {
+        const auto& cache = std::get<CachedGraphics>(impl->cache);
+        const RfxPipelineDesc* desc = &cache.desc;
+
+        nri::GraphicsPipelineDesc gpd = {};
+        gpd.pipelineLayout = impl->shader->pipelineLayout;
+        gpd.inputAssembly.topology = ToNRITopology(desc->topology);
+        gpd.inputAssembly.tessControlPointNum = (uint8_t)desc->patchControlPoints;
+
+        gpd.rasterization.fillMode = desc->wireframe ? nri::FillMode::WIREFRAME : nri::FillMode::SOLID;
+        gpd.rasterization.cullMode = (desc->cullMode == RFX_CULL_BACK)
+                                         ? nri::CullMode::BACK
+                                         : ((desc->cullMode == RFX_CULL_FRONT) ? nri::CullMode::FRONT : nri::CullMode::NONE);
+        gpd.rasterization.frontCounterClockwise = true;
+        gpd.rasterization.depthBias.constant = desc->depthBiasConstant;
+        gpd.rasterization.depthBias.clamp = desc->depthBiasClamp;
+        gpd.rasterization.depthBias.slope = desc->depthBiasSlope;
+        gpd.rasterization.shadingRate = desc->shadingRate;
+
+        uint8_t samples = (desc->sampleCount > 0) ? (uint8_t)desc->sampleCount : (uint8_t)CORE.SampleCount;
+        if (samples == 0)
+            samples = 1;
+
+        nri::MultisampleDesc ms = {};
+        ms.sampleNum = (nri::Sample_t)samples;
+        ms.sampleMask = nri::ALL;
+        gpd.multisample = &ms;
+
+        // colors
+        std::vector<nri::ColorAttachmentDesc> colorDescs;
+        if (desc->attachmentCount > 0 && desc->attachments) {
+            colorDescs.resize(desc->attachmentCount);
+            for (uint32_t i = 0; i < desc->attachmentCount; ++i) {
+                nri::ColorAttachmentDesc& cad = colorDescs[i];
+                const RfxAttachmentDesc& src = desc->attachments[i];
+                cad.format = ToNRIFormat(src.format);
+
+                nri::ColorWriteBits mask = (nri::ColorWriteBits)src.blend.writeMask;
+                cad.colorWriteMask = (mask == nri::ColorWriteBits::NONE) ? nri::ColorWriteBits::RGBA : mask;
+
+                cad.blendEnabled = src.blend.blendEnabled;
+                cad.colorBlend.srcFactor = ToNRIBlendFactor(src.blend.srcColor);
+                cad.colorBlend.dstFactor = ToNRIBlendFactor(src.blend.dstColor);
+                cad.colorBlend.op = ToNRIBlendOp(src.blend.colorOp);
+                cad.alphaBlend.srcFactor = ToNRIBlendFactor(src.blend.srcAlpha);
+                cad.alphaBlend.dstFactor = ToNRIBlendFactor(src.blend.dstAlpha);
+                cad.alphaBlend.op = ToNRIBlendOp(src.blend.alphaOp);
+            }
+        } else if (desc->colorFormat != RFX_FORMAT_UNKNOWN) {
+            colorDescs.resize(1);
+            nri::ColorAttachmentDesc& cad = colorDescs[0];
+            cad.format = ToNRIFormat(desc->colorFormat);
+
+            nri::ColorWriteBits mask = (nri::ColorWriteBits)desc->blendState.writeMask;
+            cad.colorWriteMask = (mask == nri::ColorWriteBits::NONE) ? nri::ColorWriteBits::RGBA : mask;
+
+            cad.blendEnabled = desc->blendState.blendEnabled;
+            cad.colorBlend.srcFactor = ToNRIBlendFactor(desc->blendState.srcColor);
+            cad.colorBlend.dstFactor = ToNRIBlendFactor(desc->blendState.dstColor);
+            cad.colorBlend.op = ToNRIBlendOp(desc->blendState.colorOp);
+            cad.alphaBlend.srcFactor = ToNRIBlendFactor(desc->blendState.srcAlpha);
+            cad.alphaBlend.dstFactor = ToNRIBlendFactor(desc->blendState.dstAlpha);
+            cad.alphaBlend.op = ToNRIBlendOp(desc->blendState.alphaOp);
+        }
+
+        if (!colorDescs.empty()) {
+            gpd.outputMerger.colors = colorDescs.data();
+            gpd.outputMerger.colorNum = (uint32_t)colorDescs.size();
+        }
+
+        // depth stencil
+        if (desc->depthFormat != RFX_FORMAT_UNKNOWN) {
+            gpd.outputMerger.depthStencilFormat = ToNRIFormat(desc->depthFormat);
+            if (desc->depthCompareOp != 0) {
+                gpd.outputMerger.depth.compareOp = ToNRICompareOp(desc->depthCompareOp);
+            } else {
+                gpd.outputMerger.depth.compareOp = desc->depthTest ? nri::CompareOp::LESS : nri::CompareOp::NONE;
+            }
+            gpd.outputMerger.depth.write = desc->depthWrite;
+            gpd.outputMerger.depth.boundsTest = desc->depthBoundsTest;
+
+            if (desc->stencil.enabled) {
+                gpd.outputMerger.stencil.front.compareOp = ToNRICompareOp(desc->stencil.front.compareOp);
+                gpd.outputMerger.stencil.front.failOp = ToNRIStencilOp(desc->stencil.front.failOp);
+                gpd.outputMerger.stencil.front.passOp = ToNRIStencilOp(desc->stencil.front.passOp);
+                gpd.outputMerger.stencil.front.depthFailOp = ToNRIStencilOp(desc->stencil.front.depthFailOp);
+                gpd.outputMerger.stencil.front.compareMask = desc->stencil.readMask;
+                gpd.outputMerger.stencil.front.writeMask = desc->stencil.writeMask;
+
+                gpd.outputMerger.stencil.back.compareOp = ToNRICompareOp(desc->stencil.back.compareOp);
+                gpd.outputMerger.stencil.back.failOp = ToNRIStencilOp(desc->stencil.back.failOp);
+                gpd.outputMerger.stencil.back.passOp = ToNRIStencilOp(desc->stencil.back.passOp);
+                gpd.outputMerger.stencil.back.depthFailOp = ToNRIStencilOp(desc->stencil.back.depthFailOp);
+                gpd.outputMerger.stencil.back.compareMask = desc->stencil.readMask;
+                gpd.outputMerger.stencil.back.writeMask = desc->stencil.writeMask;
+            }
+        }
+
+        if (desc->viewMask != 0) {
+            gpd.outputMerger.viewMask = desc->viewMask;
+            gpd.outputMerger.multiview = nri::Multiview::FLEXIBLE;
+        }
+
+        // shaders
+        std::vector<nri::ShaderDesc> sds;
+        bool explicitVertex = (desc->vsEntryPoint != nullptr);
+
+        for (auto& s : impl->shader->stages) {
+            if (s.stageBits & nri::StageBits::VERTEX_SHADER) {
+                if (desc->vsEntryPoint && s.sourceEntryPoint != desc->vsEntryPoint)
+                    continue;
+                sds.push_back({ s.stageBits, s.bytecode.data(), s.bytecode.size(), s.entryPoint.c_str() });
+            } else if (s.stageBits & nri::StageBits::FRAGMENT_SHADER) {
+                if (explicitVertex && desc->psEntryPoint == nullptr)
+                    continue;
+                if (desc->psEntryPoint && s.sourceEntryPoint != desc->psEntryPoint)
+                    continue;
+                sds.push_back({ s.stageBits, s.bytecode.data(), s.bytecode.size(), s.entryPoint.c_str() });
+            } else if (s.stageBits & nri::StageBits::GRAPHICS_SHADERS) {
+                sds.push_back({ s.stageBits, s.bytecode.data(), s.bytecode.size(), s.entryPoint.c_str() });
+            }
+        }
+
+        gpd.shaders = sds.data();
+        gpd.shaderNum = (uint32_t)sds.size();
+
+        // vertex input
+        nri::VertexInputDesc vid = {};
+        nri::VertexStreamDesc vs = { 0, nri::VertexStreamStepRate::PER_VERTEX };
+        std::vector<nri::VertexAttributeDesc> vads;
+
+        bool hasVertexStage = (impl->shader->stageMask & nri::StageBits::VERTEX_SHADER);
+
+        if (desc->vertexLayout && hasVertexStage) {
+            for (int i = 0; i < desc->vertexLayoutCount; ++i) {
+                const auto& el = desc->vertexLayout[i];
+                nri::VertexAttributeDesc ad = {};
+                ad.d3d = { el.semanticName ? el.semanticName : "POSITION", 0 };
+                ad.vk = { el.location };
+                ad.offset = el.offset;
+                ad.format = ToNRIFormat(el.format);
+                ad.streamIndex = 0;
+                vads.push_back(ad);
+            }
+            vid.attributes = vads.data();
+            vid.attributeNum = (uint8_t)vads.size();
+            vid.streams = &vs;
+            vid.streamNum = 1;
+            gpd.vertexInput = &vid;
+        }
+
+        NRI_CHECK(CORE.NRI.CreateGraphicsPipeline(*CORE.NRIDevice, gpd, impl->pipeline));
+    } else if (impl->type == RfxPipelineImpl::COMPUTE) {
+        const auto& cache = std::get<CachedCompute>(impl->cache);
+        const RfxComputePipelineDesc* desc = &cache.desc;
+
+        nri::ComputePipelineDesc cpd = {};
+        cpd.pipelineLayout = impl->shader->pipelineLayout;
+        for (auto& s : impl->shader->stages) {
+            if (s.stageBits & nri::StageBits::COMPUTE_SHADER) {
+                if (desc->entryPoint && s.sourceEntryPoint != desc->entryPoint)
+                    continue;
+
+                cpd.shader = { s.stageBits, s.bytecode.data(), s.bytecode.size(), s.entryPoint.c_str() };
+                break;
+            }
+        }
+        NRI_CHECK(CORE.NRI.CreateComputePipeline(*CORE.NRIDevice, cpd, impl->pipeline));
+    } else if (impl->type == RfxPipelineImpl::RAY_TRACING) {
+        const auto& cache = std::get<CachedRT>(impl->cache);
+        const RfxRayTracingPipelineDesc* desc = &cache.desc;
+
+        nri::StageBits rtMask = nri::StageBits::RAYGEN_SHADER | nri::StageBits::ANY_HIT_SHADER | nri::StageBits::CLOSEST_HIT_SHADER |
+                                nri::StageBits::MISS_SHADER | nri::StageBits::INTERSECTION_SHADER | nri::StageBits::CALLABLE_SHADER;
+
+        std::vector<nri::ShaderDesc> stageDescs;
+        std::vector<uint32_t> stageToLibraryIndex(impl->shader->stages.size(), 0);
+
+        for (size_t i = 0; i < impl->shader->stages.size(); ++i) {
+            const auto& s = impl->shader->stages[i];
+            if ((s.stageBits & rtMask) != 0) {
+                stageDescs.push_back({ s.stageBits, s.bytecode.data(), s.bytecode.size(), s.entryPoint.c_str() });
+                stageToLibraryIndex[i] = (uint32_t)stageDescs.size();
+            }
+        }
+
+        nri::ShaderLibraryDesc library = {};
+        library.shaders = stageDescs.data();
+        library.shaderNum = (uint32_t)stageDescs.size();
+
+        // TODO: this is horrible but idk how to implement it better
+        auto FindLibraryIndex = [&](const char* name) -> uint32_t {
+            if (!name)
+                return 0;
+            for (size_t i = 0; i < stageDescs.size(); ++i) {
+                for (const auto& s : impl->shader->stages) {
+                    if ((s.stageBits & rtMask) != 0 && s.sourceEntryPoint == name) {
+                        for (size_t j = 0; j < stageDescs.size(); ++j) {
+                            if (stageDescs[j].bytecode == s.bytecode.data())
+                                return (uint32_t)j;
+                        }
+                    }
+                }
+            }
+            return 0;
+        };
+
+        std::vector<nri::ShaderGroupDesc> groups(desc->groupCount);
+        for (uint32_t i = 0; i < desc->groupCount; ++i) {
+            const auto& src = desc->groups[i];
+            if (src.type == RFX_SHADER_GROUP_GENERAL) {
+                groups[i].shaderIndices[0] = FindLibraryIndex(src.generalShader);
+            } else if (src.type == RFX_SHADER_GROUP_TRIANGLES) {
+                groups[i].shaderIndices[0] = FindLibraryIndex(src.closestHitShader);
+                groups[i].shaderIndices[1] = FindLibraryIndex(src.anyHitShader);
+            } else if (src.type == RFX_SHADER_GROUP_PROCEDURAL) {
+                groups[i].shaderIndices[0] = FindLibraryIndex(src.closestHitShader);
+                groups[i].shaderIndices[1] = FindLibraryIndex(src.anyHitShader);
+                groups[i].shaderIndices[2] = FindLibraryIndex(src.intersectionShader);
+            }
+        }
+
+        nri::RayTracingPipelineDesc rtp = {};
+        rtp.pipelineLayout = impl->shader->pipelineLayout;
+        rtp.shaderLibrary = &library;
+        rtp.shaderGroups = groups.data();
+        rtp.shaderGroupNum = (uint32_t)groups.size();
+        rtp.recursionMaxDepth = desc->maxRecursionDepth;
+        rtp.rayPayloadMaxSize = desc->maxPayloadSize;
+        rtp.rayHitAttributeMaxSize = desc->maxAttributeSize;
+
+        rtp.flags = nri::RayTracingPipelineBits::NONE;
+        if (desc->flags & RFX_RT_PIPELINE_SKIP_TRIANGLES)
+            rtp.flags |= nri::RayTracingPipelineBits::SKIP_TRIANGLES;
+        if (desc->flags & RFX_RT_PIPELINE_SKIP_AABBS)
+            rtp.flags |= nri::RayTracingPipelineBits::SKIP_AABBS;
+        if (desc->flags & RFX_RT_PIPELINE_ALLOW_MICROMAPS)
+            rtp.flags |= nri::RayTracingPipelineBits::ALLOW_MICROMAPS;
+
+        NRI_CHECK(CORE.NRI.CreateRayTracingPipeline(*CORE.NRIDevice, rtp, impl->pipeline));
+    }
+}
+
+static void ProcessShaderReloads() {
+    std::set<RfxShader> toReload;
+    {
+        std::lock_guard<std::mutex> lock(CORE.HotReloadMutex);
+        if (CORE.ShadersToReload.empty())
+            return;
+        toReload = std::move(CORE.ShadersToReload);
+        CORE.ShadersToReload.clear();
+    }
+
+    for (RfxShader shader : toReload) {
+        RfxShaderImpl* impl = (RfxShaderImpl*)shader;
+        printf("[Rafx] Reloading shader: %s...\n", impl->filepath.c_str());
+
+        std::vector<const char*> definesPtrs;
+        for (const auto& s : impl->defines)
+            definesPtrs.push_back(s.c_str());
+
+        std::vector<const char*> includesPtrs;
+        for (const auto& s : impl->includeDirs)
+            includesPtrs.push_back(s.c_str());
+
+        // recompile
+        RfxShader newShaderHandle = CompileShaderInternal(
+            impl->filepath.c_str(), nullptr, definesPtrs.data(), (int)definesPtrs.size(), includesPtrs.data(), (int)includesPtrs.size()
+        );
+
+        RfxShaderImpl* newImpl = (RfxShaderImpl*)newShaderHandle;
+
+        if (newImpl) {
+            // swap resources
+            nri::PipelineLayout* oldLayout = impl->pipelineLayout;
+            rfxDeferDestruction([=]() { CORE.NRI.DestroyPipelineLayout(oldLayout); });
+
+            impl->pipelineLayout = newImpl->pipelineLayout;
+            impl->stages = std::move(newImpl->stages);
+            impl->stageMask = newImpl->stageMask;
+            impl->descriptorSetCount = newImpl->descriptorSetCount;
+            impl->bindlessSetIndex = newImpl->bindlessSetIndex;
+            impl->bindings = std::move(newImpl->bindings);
+
+            newImpl->pipelineLayout = nullptr;
+            delete newImpl;
+
+            for (auto* pipeline : impl->dependentPipelines) {
+                nri::Pipeline* oldPipe = pipeline->pipeline;
+                rfxDeferDestruction([=]() { CORE.NRI.DestroyPipeline(oldPipe); });
+
+                BuildNRIPipeline(pipeline);
+            }
+
+            printf("[Rafx] Shader reload successful.\n");
+        } else {
+            fprintf(stderr, "[Rafx] Shader reload failed.\n");
+        }
+    }
+}
+
+void rfxBeginFrame() {
+    bool wasSleeping = false;
+
+    ProcessShaderReloads();
+
+    // wait until swapchain is valid
+    while (true) {
+        bool hasExtent = (CORE.FramebufferWidth > 0 && CORE.FramebufferHeight > 0);
+        bool active = !CORE.IsMinimized && (CORE.IsFocused || (CORE.WindowFlags & RFX_WINDOW_ALWAYS_ACTIVE));
+
+        if (!hasExtent || !active) {
+            wasSleeping = true;
+            rfxEventSleep();
+            if (rfxWindowShouldClose())
+                return;
+            rfxPollInputEvents();
+            continue;
+        }
+        rfxPollInputEvents();
+        if (CORE.FramebufferWidth == 0 || CORE.FramebufferHeight == 0 || CORE.IsMinimized) {
+            continue;
+        }
+        break;
+    }
+
+    // time
+    double currentTime = rfxGetTime();
+    if (CORE.LastTime == 0.0 || wasSleeping)
+        CORE.LastTime = currentTime - 0.01666;
+
+    CORE.DeltaTime = (float)(currentTime - CORE.LastTime);
+    CORE.LastTime = currentTime;
+    if (CORE.DeltaTime <= 0.000001f)
+        CORE.DeltaTime = 0.000001f;
+
+    // recreate swapchain
+    int currentW = CORE.FramebufferWidth;
+    int currentH = CORE.FramebufferHeight;
+
+    if (currentW > 0 && currentH > 0 && ((uint32_t)currentW != CORE.SwapChainWidth || (uint32_t)currentH != CORE.SwapChainHeight)) {
+        RecreateSwapChain(currentW, currentH);
+    }
+
+    if (CORE.SwapChainWidth == 0 || CORE.SwapChainHeight == 0)
+        return;
+
+    if (CORE.FrameIndex >= GetQueuedFrameNum()) {
+        CORE.NRI.Wait(*CORE.NRIFrameFence, 1 + CORE.FrameIndex - GetQueuedFrameNum());
+
+        // process timestamps ...
+        uint32_t completedFrameIdx = (CORE.FrameIndex - GetQueuedFrameNum());
+        uint32_t qfIdx = completedFrameIdx % GetQueuedFrameNum();
+        QueuedFrame& oldQf = CORE.QueuedFrames[qfIdx];
+
+        if (oldQf.queryCount > 0) {
+            uint64_t* data = (uint64_t*)CORE.NRI.MapBuffer(*CORE.TimestampBuffer, 0, nri::WHOLE_SIZE);
+            if (data) {
+                uint64_t* frameData = data + (qfIdx * RFX_MAX_TIMESTAMP_QUERIES);
+                uint64_t freq = CORE.NRI.GetDeviceDesc(*CORE.NRIDevice).other.timestampFrequencyHz;
+                double periodUs = 1e6 / (double)freq;
+
+                CORE.LastFrameTimestamps.clear();
+                for (const auto& reg : oldQf.profileRegions) {
+                    uint64_t t0 = frameData[reg.startIndex];
+                    uint64_t t1 = frameData[reg.endIndex];
+                    if (t1 >= t0) {
+                        float duration = (float)((t1 - t0) * periodUs);
+                        CORE.LastFrameTimestamps.push_back({ reg.name, duration });
+                    }
+                }
+                CORE.NRI.UnmapBuffer(*CORE.TimestampBuffer);
+            }
+        }
+    }
+
+    // process graveyard ...
+    uint32_t frameIdx = CORE.FrameIndex % GetQueuedFrameNum();
+    {
+        auto& q = CORE.Graveyard[frameIdx];
+        std::vector<std::function<void()>> readyTasks = std::move(q.tasks);
+        q.tasks.clear();
+
+        for (auto& task : readyTasks)
+            task();
+    }
+
+    // begin implicit commandbuffer
+    QueuedFrame& qf = CORE.QueuedFrames[frameIdx];
+    CORE.NRI.ResetCommandAllocator(*qf.commandAllocator);
+
+    qf.queryCount = 0;
+    qf.profileRegions.clear();
+    qf.profileStack.clear();
+
+    uint32_t semIdx = CORE.FrameIndex % (uint32_t)CORE.SwapChainTextures.size();
+    CORE.NRI.AcquireNextTexture(*CORE.NRISwapChain, *CORE.SwapChainTextures[semIdx].acquireSemaphore, CORE.CurrentSwapChainTextureIndex);
+
+    CORE.NRI.BeginCommandBuffer(*qf.commandBuffer, CORE.Bindless.descriptorPool);
+    CORE.NRI.CmdResetQueries(*qf.commandBuffer, *CORE.TimestampPool, frameIdx * RFX_MAX_TIMESTAMP_QUERIES, RFX_MAX_TIMESTAMP_QUERIES);
+
+    qf.wrapper.ResetCache();
+
+    // run init work ...
+    if (!CORE.PendingPreBarriers.empty() || !CORE.PendingPostBarriers.empty()) {
+        for (auto& work : CORE.PendingPreBarriers)
+            work(*qf.commandBuffer);
+        CORE.PendingPreBarriers.clear();
+
+        CORE.NRI.CmdCopyStreamedData(*qf.commandBuffer, *CORE.NRIStreamer);
+
+        for (auto& work : CORE.PendingPostBarriers)
+            work(*qf.commandBuffer);
+        CORE.PendingPostBarriers.clear();
+    }
+
+    qf.wrapper.isRendering = false;
+    qf.wrapper.currentPipeline = nullptr;
+    qf.wrapper.currentVertexBuffer = nullptr;
+    qf.wrapper.currentIndexBuffer = nullptr;
+    qf.wrapper.scissorSet = false;
+    qf.wrapper.activeColorAttachments.clear();
+    qf.wrapper.currentRenderingDesc = {};
+    qf.wrapper.activeColorTextures.clear();
+    qf.wrapper.activeDepthTexture = nullptr;
+    qf.wrapper.tempDescriptors.clear();
+    qf.wrapper.barriers.bufferBarriers.clear();
+    qf.wrapper.barriers.textureBarriers.clear();
+    qf.wrapper.barriers.globalBarriers.clear();
+
+    CORE.SwapChainWrapper.texture = CORE.SwapChainTextures[CORE.CurrentSwapChainTextureIndex].texture;
+    CORE.SwapChainWrapper.format = CORE.SwapChainTextures[CORE.CurrentSwapChainTextureIndex].attachmentFormat;
+    CORE.SwapChainWrapper.width = CORE.SwapChainWidth;
+    CORE.SwapChainWrapper.height = CORE.SwapChainHeight;
+    CORE.SwapChainWrapper.sampleCount = 1;
+    CORE.SwapChainWrapper.mipNum = 1;
+    CORE.SwapChainWrapper.layerNum = 1;
+    CORE.SwapChainWrapper.mipOffset = 0;
+    CORE.SwapChainWrapper.layerOffset = 0;
+
+    if (!CORE.SwapChainWrapper.state) {
+        CORE.SwapChainWrapper.state = new RfxTextureSharedState();
+        CORE.SwapChainWrapper.state->totalMips = 1;
+        CORE.SwapChainWrapper.state->totalLayers = 1;
+        CORE.SwapChainWrapper.state->subresourceStates.resize(1);
+    }
+
+    if (CORE.SwapChainTextures[CORE.CurrentSwapChainTextureIndex].initialized) {
+        CORE.SwapChainWrapper.state->Set(0, 0, RFX_STATE_PRESENT);
+    } else {
+        CORE.SwapChainWrapper.state->Set(0, 0, RFX_STATE_UNDEFINED);
+        CORE.SwapChainTextures[CORE.CurrentSwapChainTextureIndex].initialized = true;
+    }
+
+    CORE.FrameStarted = true;
+}
+
+void rfxEndFrame() {
+    if (!CORE.FrameStarted)
+        return;
+    CORE.FrameStarted = false;
+
+    if (CORE.AllowLowLatency && CORE.LowLatencyEnabled && CORE.NRISwapChain) {
+        CORE.NRI.SetLatencyMarker(*CORE.NRISwapChain, nri::LatencyMarker::SIMULATION_END);
+    }
+
+    uint32_t frameIdx = CORE.FrameIndex % GetQueuedFrameNum();
+    QueuedFrame& qf = CORE.QueuedFrames[frameIdx];
+    RfxCommandList cmd = &qf.wrapper;
+
+    if (cmd->isRendering)
+        CORE.NRI.CmdEndRendering(*qf.commandBuffer);
+
+    // swapchain->present
+    cmd->barriers.RequireState(&CORE.SwapChainWrapper, RFX_STATE_PRESENT);
+    cmd->barriers.Flush(*qf.commandBuffer);
+
+    if (qf.queryCount > 0) {
+        CORE.NRI.CmdCopyQueries(
+            *qf.commandBuffer, *CORE.TimestampPool, frameIdx * RFX_MAX_TIMESTAMP_QUERIES, qf.queryCount, *CORE.TimestampBuffer,
+            (frameIdx * RFX_MAX_TIMESTAMP_QUERIES) * sizeof(uint64_t)
+        );
+    }
+
+    CORE.NRI.EndCommandBuffer(*qf.commandBuffer);
+
+    if (CORE.AllowLowLatency && CORE.LowLatencyEnabled && CORE.NRISwapChain) {
+        CORE.NRI.SetLatencyMarker(*CORE.NRISwapChain, nri::LatencyMarker::RENDER_SUBMIT_START);
+    }
+
+    SwapChainTexture& sc = CORE.SwapChainTextures[CORE.CurrentSwapChainTextureIndex];
+    nri::FenceSubmitDesc wait = { CORE.SwapChainTextures[CORE.FrameIndex % CORE.SwapChainTextures.size()].acquireSemaphore, 0,
+                                  nri::StageBits::COLOR_ATTACHMENT };
+    nri::FenceSubmitDesc signal = { sc.releaseSemaphore, 0, nri::StageBits::NONE };
+    nri::QueueSubmitDesc submit = {};
+    submit.waitFences = &wait;
+    submit.waitFenceNum = 1;
+    submit.signalFences = &signal;
+    submit.signalFenceNum = 1;
+    submit.commandBuffers = &qf.commandBuffer;
+    submit.commandBufferNum = 1;
+
+    if (CORE.AllowLowLatency && CORE.LowLatencyEnabled) {
+        submit.swapChain = CORE.NRISwapChain;
+    }
+
+    CORE.NRI.QueueSubmit(*CORE.NRIGraphicsQueue, submit);
+
+    if (CORE.AllowLowLatency && CORE.LowLatencyEnabled && CORE.NRISwapChain) {
+        CORE.NRI.SetLatencyMarker(*CORE.NRISwapChain, nri::LatencyMarker::RENDER_SUBMIT_END);
+    }
+
+    CORE.NRI.QueuePresent(*CORE.NRISwapChain, *sc.releaseSemaphore);
+
+    nri::FenceSubmitDesc frameSig = { CORE.NRIFrameFence, 1 + CORE.FrameIndex, nri::StageBits::NONE };
+    nri::QueueSubmitDesc frameSub = {};
+    frameSub.signalFences = &frameSig;
+    frameSub.signalFenceNum = 1;
+    CORE.NRI.QueueSubmit(*CORE.NRIGraphicsQueue, frameSub);
+
+    CORE.NRI.EndStreamerFrame(*CORE.NRIStreamer);
+    CORE.FrameIndex++;
 }

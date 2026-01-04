@@ -1251,6 +1251,7 @@ pub mod sys {
             numIncludeDirs: i32,
         ) -> RfxShader;
         pub fn rfxDestroyShader(shader: RfxShader);
+        pub fn rfxWatchShader(shader: RfxShader, watch: bool);
         pub fn rfxCreatePipeline(desc: *const RfxPipelineDesc) -> RfxPipeline;
         pub fn rfxDestroyPipeline(pipeline: RfxPipeline);
         pub fn rfxCreateComputePipeline(desc: *const RfxComputePipelineDesc) -> RfxPipeline;
@@ -3333,6 +3334,9 @@ impl Sampler {
 impl Shader {
     pub fn destroy(&self) {
         unsafe { sys::rfxDestroyShader(self.0) }
+    }
+    pub fn watch(&self, watch: bool) {
+        unsafe { sys::rfxWatchShader(self.0, watch) }
     }
 }
 impl ShaderBindingTable {

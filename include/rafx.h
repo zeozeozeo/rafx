@@ -938,6 +938,7 @@ rfxCompileShader(const char* filepath, const char** defines, int numDefines, con
 RAFX_API RfxShader
 rfxCompileShaderMem(const char* source, const char** defines, int numDefines, const char** includeDirs, int numIncludeDirs);
 RAFX_API void rfxDestroyShader(RfxShader shader);
+RAFX_API void rfxWatchShader(RfxShader shader, bool watch);
 
 // Pipelines
 RAFX_API RfxPipeline rfxCreatePipeline(const RfxPipelineDesc* desc);

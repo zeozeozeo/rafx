@@ -418,6 +418,7 @@ if(RAFX_BUILD_EXAMPLES)
     add_cpp_example(bloom examples/bloom.cc)
     add_cpp_example(low_latency examples/low_latency.cc)
     add_cpp_example(shadow_mapping examples/shadow_mapping.cc)
+    add_cpp_example(hot_reloading examples/hot_reloading.cc)
 endif()
 
 install(TARGETS ${PROJECT_NAME} NRI NRD NRDIntegration

@@ -17,9 +17,27 @@
 #include <slang.h>
 #include <slang-com-ptr.h>
 
+#if defined(__clang__)
+#    pragma clang diagnostic push
+#    pragma clang diagnostic ignored "-Wmissing-field-initializers"
+#elif defined(__GNUC__) || defined(__GNUG__)
+#    pragma GCC diagnostic push
+#    pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
+
+#include "watcher.hpp"
+
+#if defined(__clang__)
+#    pragma clang diagnostic pop
+#elif defined(__GNUC__) || defined(__GNUG__)
+#    pragma GCC diagnostic pop
+#endif
+
 #include <functional>
 #include <vector>
 #include <string>
+#include <set>
+#include <variant>
 
 // platform definitions
 #define RAFX_WINDOWS 0
@@ -184,6 +202,31 @@ struct RfxShaderImpl {
         nri::DescriptorType type;
     };
     std::vector<BindingRange> bindings;
+
+    std::string filepath;
+    std::vector<std::string> defines; // k,v,k,v,...
+    std::vector<std::string> includeDirs;
+    std::unique_ptr<wtr::watch> watcher;
+    std::set<struct RfxPipelineImpl*> dependentPipelines;
+};
+
+struct CachedGraphics {
+    RfxPipelineDesc desc;
+    std::vector<RfxAttachmentDesc> attachmentStorage;
+    std::vector<RfxVertexLayoutElement> layoutStorage;
+    std::string vsEntryStorage;
+    std::string psEntryStorage;
+};
+
+struct CachedCompute {
+    RfxComputePipelineDesc desc;
+    std::string entryStorage;
+};
+
+struct CachedRT {
+    RfxRayTracingPipelineDesc desc;
+    std::vector<RfxShaderGroup> groupStorage;
+    std::vector<std::string> nameStorage;
 };
 
 struct RfxPipelineImpl {
@@ -192,6 +235,8 @@ struct RfxPipelineImpl {
     uint32_t vertexStride;
     nri::BindPoint bindPoint;
     uint32_t shaderGroupCount;
+    enum Type { GRAPHICS, COMPUTE, RAY_TRACING } type;
+    std::variant<CachedGraphics, CachedCompute, CachedRT> cache;
 };
 
 struct RfxQueryPoolImpl {
@@ -456,6 +501,9 @@ struct CoreData {
     std::vector<DeletionQueue> Graveyard; // indexed by FrameIndex % QueuedFrameNum
     std::vector<std::function<void(nri::CommandBuffer&)>> PendingPreBarriers;
     std::vector<std::function<void(nri::CommandBuffer&)>> PendingPostBarriers;
+
+    std::mutex HotReloadMutex;
+    std::set<RfxShader> ShadersToReload;
 };
 
 extern CoreData CORE;

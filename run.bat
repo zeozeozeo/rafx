@@ -9,4 +9,5 @@ if not exist "%EXE%" (
     echo Error: "%EXE%" not found.
     exit /b 1
 )
+cd
 "%EXE%"
