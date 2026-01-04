@@ -5,8 +5,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(FETCHCONTENT_QUIET FALSE)
 
-set(RAFX_WINDOW_BACKEND "RGFW" CACHE STRING "Select window backend (RGFW or GLFW)")
-set_property(CACHE RAFX_WINDOW_BACKEND PROPERTY STRINGS "RGFW" "GLFW")
+set(RAFX_WINDOW_BACKEND "RGFW" CACHE STRING "Select window backend (RGFW, GLFW or SDL)")
+set_property(CACHE RAFX_WINDOW_BACKEND PROPERTY STRINGS "RGFW" "GLFW" "SDL")
 option(RAFX_OPTIMAL_USAGE "Assert optimal API callsites" ON)
 option(RAFX_USE_WAYLAND "Enable Wayland support on Linux" OFF)
 option(RAFX_D3D11_SUPPORT "Enable D3D11 support (Experimental)" OFF)
@@ -19,6 +19,8 @@ option(RAFX_UPSCALER_FFX "Enable support for FFX (FidelityFX Super Resolution) u
 option(RAFX_UPSCALER_XESS "Enable support for XeSS upscaler" OFF)
 option(RAFX_BUILD_EXAMPLES "Build examples" OFF)
 option(RAFX_STATIC_SLANG "Build Slang from source instead of downloading binaries" OFF)
+option(RAFX_STATIC_SDL "Link SDL statically instead of building a shared library" OFF)
+option(RAFX_STRIP_SDL "Disable useless SDL features" ON)
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
 # Arm64?
@@ -219,8 +221,12 @@ file(GLOB_RECURSE HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
 
 if(RAFX_WINDOW_BACKEND STREQUAL "GLFW")
     set(BACKEND_DEFINES RAFX_BACKEND_GLFW)
-else()
+elseif(RAFX_WINDOW_BACKEND STREQUAL "RGFW")
     set(BACKEND_DEFINES RAFX_BACKEND_RGFW)
+elseif(RAFX_WINDOW_BACKEND STREQUAL "SDL")
+    set(BACKEND_DEFINES RAFX_BACKEND_SDL)
+else()
+    message(FATAL_ERROR "Invalid windowing backend specified: ${RAFX_WINDOW_BACKEND}")
 endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -264,7 +270,7 @@ if(RAFX_WINDOW_BACKEND STREQUAL "GLFW")
             X11
         )
     endif()
-else() # RGFW
+elseif(RAFX_WINDOW_BACKEND STREQUAL "RGFW")
     if(APPLE)
         find_library(COCOA_LIBRARY Cocoa REQUIRED)
         find_library(IOKIT_LIBRARY IOKit REQUIRED)
@@ -294,6 +300,53 @@ else() # RGFW
             wayland-cursor
             xkbcommon
         )
+    endif()
+elseif(RAFX_WINDOW_BACKEND STREQUAL "SDL")
+    set(SDL_OPTIONS
+        "SDL_EXAMPLES OFF"
+        "SDL_TESTS OFF"
+        "SDL_INSTALL OFF"
+    )
+
+    if(RAFX_STRIP_SDL)
+        set(SDL_DISABLED_FEATURES
+            ALTIVEC ARMNEON ASAN DIALOG GPU ASSEMBLY AVX AVX2 AVX512F BACKGROUNDING_SIGNAL
+            CCACHE CLANG_TIDY CLOCK_GETTIME DBUS DEPS_SHARED DIRECTX POWER AUDIO DISKAUDIO DUMMYAUDIO
+            DUMMYCAMERA DUMMYVIDEO EXAMPLES EXAMPLES_LINK_SHARED FOREGROUNDING_SIGNAL
+            GCC_ATOMICS GPU_DXVK PULSEAUDIO PIPEWIRE RENDER SENSOR
+            IBUS INSTALL INSTALL_TESTS JACK JACK_SHARED KMSDRM KMSDRM_SHARED LASX LIBICONV
+            LIBUDEV LIBURING LSX METAL MMX OFFSCREEN OPENGL OPENGLES OPENVR OSS RENDER_D3D
+            RENDER_D3D11 RENDER_D3D12 RENDER_GPU RENDER_METAL RENDER_VULKAN ROCKCHIP RPATH
+            RPI SNDIO SNDIO_SHARED SYSTEM_ICONV TESTS
+            TESTS_LINK_SHARED UNINSTALL VIRTUAL_JOYSTICK VIVANTE VULKAN WASAPI
+        )
+        foreach(FEATURE ${SDL_DISABLED_FEATURES})
+            list(APPEND SDL_OPTIONS "SDL_${FEATURE} OFF")
+        endforeach()
+    endif()
+
+    if(APPLE)
+        list(APPEND SDL_OPTIONS "SDL_COCOA ON")
+    endif()
+
+    if(RAFX_STATIC_SDL)
+        list(APPEND SDL_OPTIONS "SDL_STATIC ON" "SDL_SHARED OFF")
+    else()
+        list(APPEND SDL_OPTIONS "SDL_STATIC OFF" "SDL_SHARED ON")
+    endif()
+
+    CPMAddPackage(
+        NAME SDL3
+        GITHUB_REPOSITORY libsdl-org/SDL
+        GIT_TAG release-3.4.0
+        GIT_SHALLOW TRUE
+        OPTIONS ${SDL_OPTIONS}
+    )
+
+    if(RAFX_STATIC_SDL)
+        target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3)
+    else()
+        target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3-shared)
     endif()
 endif()
 

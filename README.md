@@ -9,7 +9,7 @@ It is based on the [NVIDIA Render Interface (NRI)](https://github.com/NVIDIA-RTX
 - Fully bindless rendering approach (no CPU bindgroups, descriptor sets, ...)
 - Automatic tracking of resource states, barrier placement and transitions
 - Full parity between Vulkan, D3D12 and Metal (through MoltenVK/KosmicKrisp)
-- Built-in windowing (using RGFW or GLFW), fully cross-platform
+- Built-in windowing (using [RGFW](http://github.com/ColleagueRiley/RGFW), GLFW or SDL3), fully cross-platform
 - ImGui extension `rfxCmdDrawImGui`
 - Built-in support for [NRD](https://github.com/NVIDIA-RTX/NRD) denoisers (ReBLUR, ReLAX, Sigma) `rfxCmdDenoise`
 - Native integration with the [Slang](https://shader-slang.org/) shader language
