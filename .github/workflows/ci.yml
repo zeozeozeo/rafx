@@ -59,7 +59,7 @@ jobs:
       # macos setup
       - name: Setup Vulkan SDK (MacOS)
         if: runner.os == 'macOS'
-        uses: humantree/setup-vulkan-sdk@v1
+        uses: humbletim/setup-vulkan-sdk@v1
         with:
           vulkan-version: "latest"
 
