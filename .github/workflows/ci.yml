@@ -28,12 +28,12 @@ jobs:
               -DCMAKE_CXX_COMPILER=clang++
               -DRAFX_USE_WAYLAND=ON
           # apple silicon
-          - os: macos-14
+          - os: macos-latest
             artifact_name: rafx_release_macos_arm64.zip
             cmake_args: >
               -DCMAKE_BUILD_TYPE=Release
           # intel
-          - os: macos-13
+          - os: macos-latest-large
             artifact_name: rafx_release_macos_x64.zip
             cmake_args: >
               -DCMAKE_BUILD_TYPE=Release
@@ -59,9 +59,11 @@ jobs:
       # macos setup
       - name: Setup Vulkan SDK (MacOS)
         if: runner.os == 'macOS'
-        uses: humbletim/setup-vulkan-sdk@v1
+        uses: humbletim/setup-vulkan-sdk@v1.2.1
         with:
-          vulkan-version: "latest"
+          vulkan-query-version: latest
+          vulkan-components: Vulkan-Headers, Vulkan-Loader
+          vulkan-use-cache: true
 
       # windows setup
       - name: Setup MSVC (Windows)
