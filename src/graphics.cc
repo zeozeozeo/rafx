@@ -2065,7 +2065,7 @@ static RfxShaderImpl* TryLoadFromCache(uint64_t hash) {
         return nullptr;
 
     CacheHeader* h = (CacheHeader*)data.data();
-    if (h->magic != 0x52414658) // 'RAFX'
+    if (h->magic != 0x58464152) // 'RAFX'
         return nullptr;
 
     size_t offset = sizeof(CacheHeader);
@@ -2157,7 +2157,7 @@ static void SaveToCache(uint64_t hash, RfxShaderImpl* impl) {
 
     std::vector<uint8_t> blob;
     CacheHeader h = {};
-    h.magic = 0x52414658; // 'RAFX'
+    h.magic = 0x58464152; // 'RAFX'
     h.version = 1;
     h.stageCount = (uint32_t)impl->stages.size();
     h.bindlessSetIndex = impl->bindlessSetIndex;
