@@ -8,6 +8,9 @@
 #    undef WIN32_LEAN_AND_MEAN
 #endif
 
+#define RGFW_ALLOC RfxAlloc
+#define RGFW_FREE RfxFree
+
 #define RGFW_IMPLEMENTATION
 #include <RGFW.h>
 

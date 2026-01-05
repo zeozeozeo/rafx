@@ -90,7 +90,28 @@ void Backend_EventSleep() {
     SDL_WaitEvent(NULL);
 }
 
+static void* SDLCALL SdlAllocWrapper(size_t size) {
+    return RfxAlloc(size);
+}
+
+static void* SDLCALL SdlCallocWrapper(size_t nmemb, size_t size) {
+    size_t total = nmemb * size;
+    void* ptr = RfxAlloc(total);
+    if (ptr)
+        memset(ptr, 0, total);
+    return ptr;
+}
+
+static void* SDLCALL SdlReallocWrapper(void* mem, size_t size) {
+    return RfxRealloc(mem, size);
+}
+
+static void SDLCALL SdlFreeWrapper(void* mem) {
+    RfxFree(mem);
+}
+
 bool Backend_CreateWindow(const char* title, int width, int height) {
+    SDL_SetMemoryFunctions(SdlAllocWrapper, SdlCallocWrapper, SdlReallocWrapper, SdlFreeWrapper);
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         printf("[Rafx] SDL_Init Failed: %s\n", SDL_GetError());
         return false;

@@ -80,8 +80,31 @@ static void ApplyGlfwCreationHints(RfxWindowFlags flags) {
     glfwWindowHint(GLFW_SCALE_TO_MONITOR, (flags & RFX_WINDOW_SCALE_TO_MONITOR) ? GLFW_TRUE : GLFW_FALSE);
 }
 
+static void* GlfwAllocWrapper(size_t size, void* user) {
+    (void)user;
+    return RfxAlloc(size);
+}
+
+static void* GlfwReallocWrapper(void* ptr, size_t size, void* user) {
+    (void)user;
+    return RfxRealloc(ptr, size);
+}
+
+static void GlfwFreeWrapper(void* ptr, void* user) {
+    (void)user;
+    RfxFree(ptr);
+}
+
 bool Backend_CreateWindow(const char* title, int width, int height) {
     glfwSetErrorCallback(GLFW_ErrorCallback);
+
+    GLFWallocator allocator;
+    allocator.allocate = GlfwAllocWrapper;
+    allocator.reallocate = GlfwReallocWrapper;
+    allocator.deallocate = GlfwFreeWrapper;
+    allocator.user = nullptr;
+    glfwInitAllocator(&allocator);
+
     if (!glfwInit())
         return false;
 

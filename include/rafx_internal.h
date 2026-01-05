@@ -110,11 +110,67 @@ void Backend_GetNativeHandles(nri::Window& window);
 void Backend_EventSleep();
 
 //
+// Allocator
+//
+
+extern RfxAllocator g_Allocator;
+void* RfxAlloc(size_t size, size_t align = 16);
+void* RfxRealloc(void* ptr, size_t size, size_t align = 16);
+void RfxFree(void* ptr);
+
+template <typename T, typename... Args>
+T* RfxNew(Args&&... args) {
+    void* ptr = RfxAlloc(sizeof(T), alignof(T));
+    return new (ptr) T(std::forward<Args>(args)...);
+}
+
+template <typename T>
+void RfxDelete(T* ptr) {
+    if (ptr) {
+        ptr->~T();
+        RfxFree(ptr);
+    }
+}
+
+template <typename T>
+struct RfxStlAllocator {
+    using value_type = T;
+
+    RfxStlAllocator() noexcept = default;
+    template <typename U>
+    RfxStlAllocator(const RfxStlAllocator<U>&) noexcept {}
+
+    T* allocate(size_t n) {
+        return static_cast<T*>(RfxAlloc(n * sizeof(T), alignof(T)));
+    }
+
+    void deallocate(T* p, size_t) {
+        RfxFree(p);
+    }
+
+    bool operator==(const RfxStlAllocator&) const {
+        return true;
+    }
+    bool operator!=(const RfxStlAllocator&) const {
+        return false;
+    }
+};
+
+template <typename T>
+using RfxVector = std::vector<T, RfxStlAllocator<T>>;
+template <typename T>
+using RfxSet = std::set<T, std::less<T>, RfxStlAllocator<T>>;
+
+void* NRI_CALL InternalNriAlloc(void* userArg, size_t size, size_t alignment);
+void* NRI_CALL InternalNriRealloc(void* userArg, void* memory, size_t size, size_t alignment);
+void NRI_CALL InternalNriFree(void* userArg, void* memory);
+
+//
 // Resource impls
 //
 
 struct RfxTextureSharedState {
-    std::vector<RfxResourceState> subresourceStates; // size() = mipLevels * arrayLayers
+    RfxVector<RfxResourceState> subresourceStates; // size() = mipLevels * arrayLayers
     uint32_t totalMips;
     uint32_t totalLayers;
     int refCount = 1;
@@ -125,7 +181,7 @@ struct RfxTextureSharedState {
     void Release() {
         refCount--;
         if (refCount == 0)
-            delete this;
+            RfxDelete(this);
     }
 
     // Get gets the state of specific subresource
@@ -183,12 +239,12 @@ struct RfxBufferImpl {
 
 struct RfxShaderImpl {
     struct Stage {
-        std::vector<uint8_t> bytecode;
+        RfxVector<uint8_t> bytecode;
         nri::StageBits stageBits;
         std::string entryPoint;       // "main" for SPIR-V
         std::string sourceEntryPoint; // name in source code
     };
-    std::vector<Stage> stages;
+    RfxVector<Stage> stages;
     nri::PipelineLayout* pipelineLayout;
     uint32_t descriptorSetCount;
     nri::StageBits stageMask;
@@ -202,21 +258,21 @@ struct RfxShaderImpl {
         uint32_t count;
         nri::DescriptorType type;
     };
-    std::vector<BindingRange> bindings;
-    std::vector<nri::RootConstantDesc> rootConstants;
-    std::vector<nri::RootSamplerDesc> rootSamplers;
+    RfxVector<BindingRange> bindings;
+    RfxVector<nri::RootConstantDesc> rootConstants;
+    RfxVector<nri::RootSamplerDesc> rootSamplers;
 
     std::string filepath;
-    std::vector<std::string> defines; // k,v,k,v,...
-    std::vector<std::string> includeDirs;
+    RfxVector<std::string> defines; // k,v,k,v,...
+    RfxVector<std::string> includeDirs;
     std::unique_ptr<wtr::watch> watcher;
-    std::set<struct RfxPipelineImpl*> dependentPipelines;
+    RfxSet<struct RfxPipelineImpl*> dependentPipelines;
 };
 
 struct CachedGraphics {
     RfxPipelineDesc desc;
-    std::vector<RfxAttachmentDesc> attachmentStorage;
-    std::vector<RfxVertexLayoutElement> layoutStorage;
+    RfxVector<RfxAttachmentDesc> attachmentStorage;
+    RfxVector<RfxVertexLayoutElement> layoutStorage;
     std::string vsEntryStorage;
     std::string psEntryStorage;
 };
@@ -228,8 +284,8 @@ struct CachedCompute {
 
 struct CachedRT {
     RfxRayTracingPipelineDesc desc;
-    std::vector<RfxShaderGroup> groupStorage;
-    std::vector<std::string> nameStorage;
+    RfxVector<RfxShaderGroup> groupStorage;
+    RfxVector<std::string> nameStorage;
 };
 
 struct RfxPipelineImpl {
@@ -254,8 +310,8 @@ struct RfxAccelerationStructureImpl {
     uint32_t bindlessIndex;
 
     nri::AccelerationStructureDesc nriDesc;
-    std::vector<nri::BottomLevelGeometryDesc> geometries;
-    std::vector<nri::BottomLevelMicromapDesc> micromapDescs;
+    RfxVector<nri::BottomLevelGeometryDesc> geometries;
+    RfxVector<nri::BottomLevelMicromapDesc> micromapDescs;
 
     nri::AccessBits currentAccess = nri::AccessBits::NONE;
     nri::StageBits currentStage = nri::StageBits::NONE;
@@ -292,9 +348,9 @@ struct RfxFenceImpl {
 //
 
 struct BarrierBatcher {
-    std::vector<nri::BufferBarrierDesc> bufferBarriers;
-    std::vector<nri::TextureBarrierDesc> textureBarriers;
-    std::vector<nri::GlobalBarrierDesc> globalBarriers;
+    RfxVector<nri::BufferBarrierDesc> bufferBarriers;
+    RfxVector<nri::TextureBarrierDesc> textureBarriers;
+    RfxVector<nri::GlobalBarrierDesc> globalBarriers;
 
     void RequireState(RfxBuffer buffer, RfxResourceState state);
     void RequireState(RfxTexture texture, RfxResourceState state);
@@ -309,8 +365,8 @@ struct RfxCommandListImpl {
     nri::CommandBuffer* nriCmd;
 
     // ring buffer
-    std::vector<nri::CommandAllocator*> allocators;
-    std::vector<nri::CommandBuffer*> buffers;
+    RfxVector<nri::CommandAllocator*> allocators;
+    RfxVector<nri::CommandBuffer*> buffers;
 
     RfxQueueType queueType;
     bool isSecondary;
@@ -330,12 +386,12 @@ struct RfxCommandListImpl {
     bool scissorSet = false;
 
     // active renderpass state
-    std::vector<nri::AttachmentDesc> activeColorAttachments;
+    RfxVector<nri::AttachmentDesc> activeColorAttachments;
     nri::RenderingDesc currentRenderingDesc = {};
     nri::Viewport currentViewport = {};
-    std::vector<RfxTexture> activeColorTextures;
+    RfxVector<RfxTexture> activeColorTextures;
     RfxTexture activeDepthTexture = nullptr;
-    std::vector<nri::Descriptor*> tempDescriptors;
+    RfxVector<nri::Descriptor*> tempDescriptors;
 
     void ResetCache() {
         lastBoundVertexBuffer = nullptr;
@@ -358,13 +414,13 @@ struct BindlessData {
     nri::Descriptor* staticSamplers[4];
 
     // stacks
-    std::vector<uint32_t> freeTextureSlots;
+    RfxVector<uint32_t> freeTextureSlots;
     uint32_t textureHighWaterMark = 0;
 
-    std::vector<uint32_t> freeBufferSlots;
+    RfxVector<uint32_t> freeBufferSlots;
     uint32_t bufferHighWaterMark = 0;
 
-    std::vector<uint32_t> freeASSlots;
+    RfxVector<uint32_t> freeASSlots;
     uint32_t asHighWaterMark = 0;
 };
 
@@ -407,8 +463,8 @@ struct QueuedFrame {
     RfxCommandListImpl wrapper;
 
     // Profiler state
-    std::vector<ProfileRegion> profileRegions;
-    std::vector<int> profileStack;
+    RfxVector<ProfileRegion> profileRegions;
+    RfxVector<int> profileStack;
     uint32_t queryCount;
 };
 
@@ -464,8 +520,8 @@ struct CoreData {
     BindlessData Bindless;
 
     // Frames
-    std::vector<QueuedFrame> QueuedFrames;
-    std::vector<SwapChainTexture> SwapChainTextures;
+    RfxVector<QueuedFrame> QueuedFrames;
+    RfxVector<SwapChainTexture> SwapChainTextures;
     uint32_t FrameIndex = 0;
     uint32_t CurrentSwapChainTextureIndex = 0;
     uint32_t SwapChainWidth = 0;
@@ -478,7 +534,7 @@ struct CoreData {
     nri::QueryPool* TimestampPool = nullptr;
     nri::Buffer* TimestampBuffer = nullptr;
     nri::Memory* TimestampBufferMemory = nullptr;
-    std::vector<RfxGpuTimestamp> LastFrameTimestamps;
+    RfxVector<RfxGpuTimestamp> LastFrameTimestamps;
 
     // Implicit resources
     struct {
@@ -499,14 +555,14 @@ struct CoreData {
     Slang::ComPtr<slang::IGlobalSession> SlangSession;
 
     struct DeletionQueue {
-        std::vector<std::function<void()>> tasks;
+        RfxVector<std::function<void()>> tasks;
     };
-    std::vector<DeletionQueue> Graveyard; // indexed by FrameIndex % QueuedFrameNum
-    std::vector<std::function<void(nri::CommandBuffer&)>> PendingPreBarriers;
-    std::vector<std::function<void(nri::CommandBuffer&)>> PendingPostBarriers;
+    RfxVector<DeletionQueue> Graveyard; // indexed by FrameIndex % QueuedFrameNum
+    RfxVector<std::function<void(nri::CommandBuffer&)>> PendingPreBarriers;
+    RfxVector<std::function<void(nri::CommandBuffer&)>> PendingPostBarriers;
 
     std::mutex HotReloadMutex;
-    std::set<RfxShader> ShadersToReload;
+    RfxSet<RfxShader> ShadersToReload;
 
     // vfs, shader cache
     bool ShaderCacheEnabled = false;

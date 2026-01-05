@@ -28,6 +28,7 @@ It is based on the [NVIDIA Render Interface (NRI)](https://github.com/NVIDIA-RTX
 - GPU profiler, timeline annotations (GAPI, Nsight, PIX), resource naming
 - ImGui extension `rfxCmdDrawImGui`
 - Shader cache / precompilation
+- Honored user-provided memory allocator
 - Lots of [examples](./examples) to get you started
 
 ## Examples

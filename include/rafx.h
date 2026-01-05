@@ -44,6 +44,13 @@ extern "C" {
 // Typedefs
 //
 
+typedef struct {
+    void* (*allocate)(void* userArg, size_t size, size_t alignment);
+    void* (*reallocate)(void* userArg, void* memory, size_t size, size_t alignment);
+    void (*free)(void* userArg, void* memory);
+    void* userArg;
+} RfxAllocator;
+
 typedef bool (*RfxShaderCacheLoadCallback)(uint64_t hash, void** outData, size_t* outSize, void* user);
 typedef void (*RfxShaderCacheSaveCallback)(uint64_t hash, const void* data, size_t size, void* user);
 
@@ -1179,6 +1186,12 @@ RAFX_API RfxUpscaler rfxCreateUpscaler(const RfxUpscalerDesc* desc);
 RAFX_API void rfxDestroyUpscaler(RfxUpscaler upscaler);
 RAFX_API void rfxGetUpscalerProps(RfxUpscaler upscaler, RfxUpscalerProps* outProps);
 RAFX_API void rfxCmdUpscale(RfxCommandList cmd, RfxUpscaler upscaler, const RfxUpscaleDesc* desc);
+
+//
+// Memory
+//
+
+RAFX_API void rfxSetAllocator(const RfxAllocator* allocator);
 
 #ifdef __cplusplus
 } // extern "C"

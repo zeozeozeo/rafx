@@ -377,7 +377,7 @@ static void UploadToResource(
         uint32_t lNum = dstRegion ? 1 : textureHandle->layerNum;
 
         // capture states of the relevant region of the texture
-        std::vector<RfxResourceState> capturedStates;
+        RfxVector<RfxResourceState> capturedStates;
         capturedStates.reserve(lNum * mNum);
         for (uint32_t l = 0; l < lNum; ++l) {
             for (uint32_t m = 0; m < mNum; ++m) {
@@ -387,7 +387,7 @@ static void UploadToResource(
 
         auto preBarrier = [=](nri::CommandBuffer& cb) {
             nri::BarrierDesc bd = {};
-            std::vector<nri::TextureBarrierDesc> tbds;
+            RfxVector<nri::TextureBarrierDesc> tbds;
 
             size_t idx = 0;
             for (uint32_t l = 0; l < lNum; ++l) {
@@ -425,7 +425,7 @@ static void UploadToResource(
 
         auto postBarrier = [=](nri::CommandBuffer& cb) {
             nri::BarrierDesc bd = {};
-            std::vector<nri::TextureBarrierDesc> tbds;
+            RfxVector<nri::TextureBarrierDesc> tbds;
             nri::AccessBits finAcc;
             nri::Layout finLay;
             nri::StageBits finStg;
@@ -1165,7 +1165,7 @@ void rfxCmdClear(RfxCommandList cmd, RfxColor color) {
     if (!cmd->isRendering)
         return;
 
-    std::vector<nri::ClearAttachmentDesc> clears;
+    RfxVector<nri::ClearAttachmentDesc> clears;
     for (uint32_t i = 0; i < cmd->currentRenderingDesc.colorNum; ++i) {
         nri::ClearAttachmentDesc clr = {};
         clr.planes = nri::PlaneBits::COLOR;
@@ -1395,7 +1395,7 @@ static void AllocateAndBind(T* resource, nri::MemoryLocation loc, nri::Memory*& 
 }
 
 RfxBuffer rfxCreateBuffer(size_t size, size_t stride, RfxBufferUsageFlags usage, RfxMemoryType memType, const void* initialData) {
-    RfxBufferImpl* impl = new RfxBufferImpl{ nullptr, nullptr, nullptr, nullptr, (uint64_t)size, (uint32_t)stride, 0 };
+    RfxBufferImpl* impl = RfxNew<RfxBufferImpl>(nullptr, nullptr, nullptr, nullptr, (uint64_t)size, (uint32_t)stride, 0);
     impl->bindlessIndex = AllocBufferSlot();
 
     nri::BufferDesc bd = {};
@@ -1511,7 +1511,7 @@ void rfxDestroyBuffer(RfxBuffer buffer) {
             CORE.NRI.DestroyDescriptor(ptr->descriptorUAV);
         CORE.NRI.DestroyBuffer(ptr->buffer);
         CORE.NRI.FreeMemory(ptr->memory);
-        delete ptr;
+        RfxDelete(ptr);
     });
 }
 
@@ -1550,7 +1550,7 @@ RfxTexture rfxCreateTextureEx(const RfxTextureDesc* desc) {
     uint32_t mips = (desc->mipLevels <= 0) ? 1 : desc->mipLevels;
     uint32_t layers = (desc->arrayLayers <= 0) ? 1 : desc->arrayLayers;
 
-    RfxTextureImpl* impl = new RfxTextureImpl();
+    RfxTextureImpl* impl = RfxNew<RfxTextureImpl>();
     impl->format = ToNRIFormat(desc->format);
     impl->width = desc->width;
     impl->height = desc->height;
@@ -1562,7 +1562,7 @@ RfxTexture rfxCreateTextureEx(const RfxTextureDesc* desc) {
     impl->layerOffset = 0;
     impl->layerNum = layers;
 
-    impl->state = new RfxTextureSharedState();
+    impl->state = RfxNew<RfxTextureSharedState>();
     impl->state->totalMips = mips;
     impl->state->totalLayers = layers;
     impl->state->subresourceStates.resize(mips * layers, RFX_STATE_UNDEFINED);
@@ -1718,7 +1718,7 @@ void rfxDestroyTexture(RfxTexture texture) {
 
         if (ptr->state)
             ptr->state->Release();
-        delete ptr;
+        RfxDelete(ptr);
     });
 }
 
@@ -1727,7 +1727,7 @@ uint32_t rfxGetTextureId(RfxTexture texture) {
 }
 
 RfxSampler rfxCreateSampler(RfxFilter filter, RfxAddressMode addressMode) {
-    RfxSamplerImpl* impl = new RfxSamplerImpl();
+    RfxSamplerImpl* impl = RfxNew<RfxSamplerImpl>();
     nri::SamplerDesc sd = {};
     nri::Filter f = (filter == RFX_FILTER_LINEAR) ? nri::Filter::LINEAR : nri::Filter::NEAREST;
     sd.filters = { f, f, f, nri::FilterOp::AVERAGE };
@@ -1747,7 +1747,7 @@ void rfxDestroySampler(RfxSampler sampler) {
     RfxSamplerImpl* ptr = sampler;
     rfxDeferDestruction([=]() {
         CORE.NRI.DestroyDescriptor(ptr->descriptor);
-        delete ptr;
+        RfxDelete(ptr);
     });
 }
 
@@ -1834,7 +1834,7 @@ struct RafxMemoryBlob : public ISlangBlob {
     SLANG_NO_THROW uint32_t SLANG_MCALL release() override {
         uint32_t r = --m_RefCount;
         if (r == 0)
-            delete this;
+            RfxDelete(this);
         return r;
     }
 
@@ -1897,15 +1897,15 @@ struct RafxFileSystem : public ISlangFileSystem {
             if (it != m_VirtualFiles.end()) {
                 // Copy to ensure blob owns memory
                 size_t len = it->second.size();
-                char* buf = new char[len];
+                char* buf = (char*)RfxAlloc(len * sizeof(char));
                 memcpy(buf, it->second.c_str(), len);
-                *outBlob = new RafxMemoryBlob(buf, len, true);
+                *outBlob = RfxNew<RafxMemoryBlob>(buf, len, true);
                 return SLANG_OK;
             }
         }
 
         if (strcmp(path, "rafx.slang") == 0) {
-            *outBlob = new RafxMemoryBlob(s_RafxSlangContent, strlen(s_RafxSlangContent), false);
+            *outBlob = RfxNew<RafxMemoryBlob>(s_RafxSlangContent, strlen(s_RafxSlangContent), false);
             return SLANG_OK;
         }
 
@@ -1917,7 +1917,7 @@ struct RafxFileSystem : public ISlangFileSystem {
         long size = ftell(f);
         fseek(f, 0, SEEK_SET);
 
-        char* buffer = new char[size];
+        char* buffer = (char*)RfxAlloc(size * sizeof(char));
         if (fread(buffer, 1, size, f) != (size_t)size) {
             delete[] buffer;
             fclose(f);
@@ -1925,7 +1925,7 @@ struct RafxFileSystem : public ISlangFileSystem {
         }
         fclose(f);
 
-        *outBlob = new RafxMemoryBlob(buffer, size, true);
+        *outBlob = RfxNew<RafxMemoryBlob>(buffer, size, true);
         return SLANG_OK;
     }
 };
@@ -2039,7 +2039,7 @@ static RfxShaderImpl* TryLoadFromCache(uint64_t hash) {
     if (!CORE.ShaderCacheEnabled)
         return nullptr;
 
-    std::vector<uint8_t> data;
+    RfxVector<uint8_t> data;
     {
         std::lock_guard<std::mutex> lock(CORE.ShaderCacheMutex);
         if (CORE.CacheLoadCb) {
@@ -2054,7 +2054,7 @@ static RfxShaderImpl* TryLoadFromCache(uint64_t hash) {
             if (std::filesystem::exists(p)) {
                 std::ifstream file(p, std::ios::binary);
                 if (file)
-                    data = std::vector<uint8_t>((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+                    data = RfxVector<uint8_t>((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
             }
         }
     }
@@ -2074,7 +2074,7 @@ static RfxShaderImpl* TryLoadFromCache(uint64_t hash) {
     if (!Check(0))
         return nullptr;
 
-    RfxShaderImpl* impl = new RfxShaderImpl();
+    RfxShaderImpl* impl = RfxNew<RfxShaderImpl>();
     impl->bindlessSetIndex = h->bindlessSetIndex;
     impl->descriptorSetCount = h->descriptorSetCount;
     impl->stageMask = (nri::StageBits)h->stageMask;
@@ -2155,7 +2155,7 @@ static void SaveToCache(uint64_t hash, RfxShaderImpl* impl) {
     if (!CORE.ShaderCacheEnabled)
         return;
 
-    std::vector<uint8_t> blob;
+    RfxVector<uint8_t> blob;
     CacheHeader h = {};
     h.magic = 0x58464152; // 'RAFX'
     h.version = 1;
@@ -2211,8 +2211,8 @@ static void SaveToCache(uint64_t hash, RfxShaderImpl* impl) {
 
 static bool CreatePipelineLayoutFromImpl(RfxShaderImpl* impl, bool isD3D12, bool hasRT) {
     // reconstruct descriptor sets from bindings
-    std::vector<std::vector<nri::DescriptorRangeDesc>> rangeStorage;
-    std::map<uint32_t, std::vector<nri::DescriptorRangeDesc>> setBuilders;
+    RfxVector<RfxVector<nri::DescriptorRangeDesc>> rangeStorage;
+    std::map<uint32_t, RfxVector<nri::DescriptorRangeDesc>> setBuilders;
 
     for (const auto& b : impl->bindings) {
         nri::DescriptorRangeDesc range = {};
@@ -2223,7 +2223,7 @@ static bool CreatePipelineLayoutFromImpl(RfxShaderImpl* impl, bool isD3D12, bool
         setBuilders[b.setIndex].push_back(range);
     }
 
-    std::vector<nri::DescriptorSetDesc> allSets;
+    RfxVector<nri::DescriptorSetDesc> allSets;
     for (auto& [space, ranges] : setBuilders) {
         if (space == 1)
             continue;
@@ -2305,12 +2305,12 @@ static RfxShader CompileShaderInternal(
                     cached->filepath = path;
                 return (RfxShader)cached;
             }
-            delete cached;
+            RfxDelete(cached);
         }
     }
 
     // setup compiler session
-    std::vector<slang::CompilerOptionEntry> sessionOpts;
+    RfxVector<slang::CompilerOptionEntry> sessionOpts;
     sessionOpts.push_back({ slang::CompilerOptionName::DebugInformation, { .intValue0 = SLANG_DEBUG_INFO_LEVEL_STANDARD } });
     sessionOpts.push_back({ slang::CompilerOptionName::Optimization, { .intValue0 = SLANG_OPTIMIZATION_LEVEL_DEFAULT } });
 
@@ -2318,7 +2318,7 @@ static RfxShader CompileShaderInternal(
         { slang::CompilerOptionName::Capability, { .intValue0 = CORE.SlangSession->findCapability(isD3D12 ? "sm_6_0" : "spirv_1_6") } }
     );
 
-    std::vector<slang::PreprocessorMacroDesc> prepMacros;
+    RfxVector<slang::PreprocessorMacroDesc> prepMacros;
     for (int i = 0; i < numDefines; i += 2) {
         prepMacros.push_back({ defines[i], defines[i + 1] });
     }
@@ -2373,7 +2373,7 @@ static RfxShader CompileShaderInternal(
     if (!module)
         return nullptr;
 
-    std::vector<slang::IComponentType*> components = { module };
+    RfxVector<slang::IComponentType*> components = { module };
     uint32_t definedEPCount = module->getDefinedEntryPointCount();
     uint32_t accumulatedStages = 0;
 
@@ -2401,7 +2401,7 @@ static RfxShader CompileShaderInternal(
     if (!linkedProgram)
         return nullptr;
 
-    RfxShaderImpl* impl = new RfxShaderImpl();
+    RfxShaderImpl* impl = RfxNew<RfxShaderImpl>();
     if (path)
         impl->filepath = path;
     for (int i = 0; i < numDefines; i++)
@@ -2501,7 +2501,7 @@ static RfxShader CompileShaderInternal(
 
     if (!CreatePipelineLayoutFromImpl(impl, isD3D12, hasRT)) {
         fprintf(stderr, "Error: Failed to create pipeline layout.\n");
-        delete impl;
+        RfxDelete(impl);
         return nullptr;
     }
 
@@ -2530,7 +2530,7 @@ static RfxShader CompileShaderInternal(
 
         impl->stages.push_back(
             { .bytecode =
-                  std::vector<uint8_t>((uint8_t*)code->getBufferPointer(), (uint8_t*)code->getBufferPointer() + code->getBufferSize()),
+                  RfxVector<uint8_t>((uint8_t*)code->getBufferPointer(), (uint8_t*)code->getBufferPointer() + code->getBufferSize()),
               .stageBits = stageBit,
               .entryPoint = finalEntryPoint,
               .sourceEntryPoint = sourceName ? sourceName : "main" }
@@ -2538,7 +2538,7 @@ static RfxShader CompileShaderInternal(
     }
 
     if (impl->stages.empty()) {
-        delete impl;
+        RfxDelete(impl);
         return nullptr;
     }
 
@@ -2563,7 +2563,7 @@ void rfxDestroyShader(RfxShader shader) {
     RfxShaderImpl* ptr = shader;
     rfxDeferDestruction([=]() {
         CORE.NRI.DestroyPipelineLayout(ptr->pipelineLayout);
-        delete ptr;
+        RfxDelete(ptr);
     });
 }
 
@@ -2729,7 +2729,7 @@ static CachedRT CacheRTDesc(const RfxRayTracingPipelineDesc* src) {
 }
 
 RfxPipeline rfxCreatePipeline(const RfxPipelineDesc* desc) {
-    RfxPipelineImpl* impl = new RfxPipelineImpl();
+    RfxPipelineImpl* impl = RfxNew<RfxPipelineImpl>();
     impl->shader = desc->shader;
     impl->vertexStride = desc->vertexStride;
     impl->bindPoint = nri::BindPoint::GRAPHICS;
@@ -2765,7 +2765,7 @@ RfxPipeline rfxCreatePipeline(const RfxPipelineDesc* desc) {
     ms.sampleMask = nri::ALL;
     gpd.multisample = &ms;
 
-    std::vector<nri::ColorAttachmentDesc> colorDescs;
+    RfxVector<nri::ColorAttachmentDesc> colorDescs;
     if (desc->attachmentCount > 0 && desc->attachments) {
         colorDescs.resize(desc->attachmentCount);
         for (uint32_t i = 0; i < desc->attachmentCount; ++i) {
@@ -2842,7 +2842,7 @@ RfxPipeline rfxCreatePipeline(const RfxPipelineDesc* desc) {
     bool explicitVertex = (desc->vsEntryPoint != nullptr);
 
     // filter entrypoints
-    std::vector<nri::ShaderDesc> sds;
+    RfxVector<nri::ShaderDesc> sds;
     for (auto& s : impl->shader->stages) {
         if (s.stageBits & nri::StageBits::VERTEX_SHADER) {
             if (desc->vsEntryPoint && s.sourceEntryPoint != desc->vsEntryPoint)
@@ -2864,7 +2864,7 @@ RfxPipeline rfxCreatePipeline(const RfxPipelineDesc* desc) {
 
     nri::VertexInputDesc vid = {};
     nri::VertexStreamDesc vs = { 0, nri::VertexStreamStepRate::PER_VERTEX };
-    std::vector<nri::VertexAttributeDesc> vads;
+    RfxVector<nri::VertexAttributeDesc> vads;
 
     // check if we actually found a vertex shader before trying to setup input layout
     bool hasVertexStage = (impl->shader->stageMask & nri::StageBits::VERTEX_SHADER);
@@ -2896,12 +2896,12 @@ void rfxDestroyPipeline(RfxPipeline pipeline) {
     RfxPipelineImpl* ptr = pipeline;
     rfxDeferDestruction([=]() {
         CORE.NRI.DestroyPipeline(ptr->pipeline);
-        delete ptr;
+        RfxDelete(ptr);
     });
 }
 
 RfxPipeline rfxCreateComputePipeline(const RfxComputePipelineDesc* desc) {
-    RfxPipelineImpl* impl = new RfxPipelineImpl();
+    RfxPipelineImpl* impl = RfxNew<RfxPipelineImpl>();
     impl->shader = desc->shader;
     impl->bindPoint = nri::BindPoint::COMPUTE;
 
@@ -3065,7 +3065,7 @@ static nrd::ResourceType ToNRDResourceType(RfxDenoiserResourceId id) {
 }
 
 RfxDenoiser rfxCreateDenoiser(RfxDenoiserType type, int width, int height) {
-    RfxDenoiserImpl* impl = new RfxDenoiserImpl();
+    RfxDenoiserImpl* impl = RfxNew<RfxDenoiserImpl>();
     impl->type = type;
     impl->width = width;
     impl->height = height;
@@ -3077,7 +3077,7 @@ RfxDenoiser rfxCreateDenoiser(RfxDenoiserType type, int width, int height) {
     case RFX_DENOISER_REBLUR_DIFFUSE_SPECULAR: nrdDenoiser = nrd::Denoiser::REBLUR_DIFFUSE_SPECULAR; break;
     case RFX_DENOISER_RELAX_DIFFUSE: nrdDenoiser = nrd::Denoiser::RELAX_DIFFUSE; break;
     case RFX_DENOISER_RELAX_DIFFUSE_SPECULAR: nrdDenoiser = nrd::Denoiser::RELAX_DIFFUSE_SPECULAR; break;
-    default: delete impl; return nullptr;
+    default: RfxDelete(impl); return nullptr;
     }
 
     impl->identifier = nrd::Identifier(nrdDenoiser);
@@ -3088,6 +3088,11 @@ RfxDenoiser rfxCreateDenoiser(RfxDenoiserType type, int width, int height) {
     instanceCreationDesc.denoisers = &impl->denoiserDesc;
     instanceCreationDesc.denoisersNum = 1;
 
+    instanceCreationDesc.allocationCallbacks.Allocate = InternalNriAlloc;
+    instanceCreationDesc.allocationCallbacks.Reallocate = InternalNriRealloc;
+    instanceCreationDesc.allocationCallbacks.Free = InternalNriFree;
+    instanceCreationDesc.allocationCallbacks.userArg = &g_Allocator;
+
     nrd::IntegrationCreationDesc integrationDesc = {};
     integrationDesc.queuedFrameNum = GetQueuedFrameNum();
     integrationDesc.resourceWidth = (uint16_t)width;
@@ -3097,7 +3102,7 @@ RfxDenoiser rfxCreateDenoiser(RfxDenoiserType type, int width, int height) {
     // recreate NRD
     if (impl->instance.Recreate(integrationDesc, instanceCreationDesc, CORE.NRIDevice) != nrd::Result::SUCCESS) {
         fprintf(stderr, "Failed to initialize NRD\n");
-        delete impl;
+        RfxDelete(impl);
         return nullptr;
     }
 
@@ -3112,7 +3117,7 @@ void rfxDestroyDenoiser(RfxDenoiser denoiser) {
 
     rfxDeferDestruction([=]() {
         ptr->instance.Destroy();
-        delete ptr;
+        RfxDelete(ptr);
     });
 }
 
@@ -3308,7 +3313,7 @@ uint32_t rfxGetGpuTimestamps(RfxGpuTimestamp* outTimestamps, uint32_t maxCount) 
 }
 
 RfxAccelerationStructure rfxCreateAccelerationStructure(const RfxAccelerationStructureDesc* desc) {
-    RfxAccelerationStructureImpl* impl = new RfxAccelerationStructureImpl();
+    RfxAccelerationStructureImpl* impl = RfxNew<RfxAccelerationStructureImpl>();
     bool isTLAS = (desc->type == RFX_AS_TOP_LEVEL);
     impl->bindlessIndex = isTLAS ? AllocASSlot() : 0;
     impl->descriptor = nullptr;
@@ -3404,7 +3409,7 @@ void rfxDestroyAccelerationStructure(RfxAccelerationStructure as) {
             CORE.NRI.DestroyDescriptor(as->descriptor);
         CORE.NRI.DestroyAccelerationStructure(as->as);
         CORE.NRI.FreeMemory(as->memory);
-        delete as;
+        RfxDelete(as);
     });
 }
 
@@ -3416,7 +3421,7 @@ uint64_t rfxGetAccelerationStructureScratchSize(RfxAccelerationStructure as) {
 }
 
 void rfxCmdUploadInstances(RfxCommandList cmd, RfxBuffer dstBuffer, const RfxInstance* instances, uint32_t instanceCount) {
-    std::vector<nri::TopLevelInstance> nriInstances(instanceCount);
+    RfxVector<nri::TopLevelInstance> nriInstances(instanceCount);
     for (uint32_t i = 0; i < instanceCount; ++i) {
         memcpy(nriInstances[i].transform, instances[i].transform, sizeof(float) * 12);
         nriInstances[i].instanceId = instances[i].instanceId;
@@ -3492,7 +3497,7 @@ void rfxCmdBuildAccelerationStructure(RfxCommandList cmd, RfxAccelerationStructu
 }
 
 RfxPipeline rfxCreateRayTracingPipeline(const RfxRayTracingPipelineDesc* desc) {
-    RfxPipelineImpl* impl = new RfxPipelineImpl();
+    RfxPipelineImpl* impl = RfxNew<RfxPipelineImpl>();
     impl->shader = (RfxShaderImpl*)desc->shader;
     impl->bindPoint = nri::BindPoint::RAY_TRACING;
     impl->shaderGroupCount = desc->groupCount;
@@ -3507,8 +3512,8 @@ RfxPipeline rfxCreateRayTracingPipeline(const RfxRayTracingPipelineDesc* desc) {
     nri::StageBits rtMask = nri::StageBits::RAYGEN_SHADER | nri::StageBits::ANY_HIT_SHADER | nri::StageBits::CLOSEST_HIT_SHADER |
                             nri::StageBits::MISS_SHADER | nri::StageBits::INTERSECTION_SHADER | nri::StageBits::CALLABLE_SHADER;
 
-    std::vector<nri::ShaderDesc> stageDescs;
-    std::vector<uint32_t> stageToLibraryIndex(impl->shader->stages.size(), 0);
+    RfxVector<nri::ShaderDesc> stageDescs;
+    RfxVector<uint32_t> stageToLibraryIndex(impl->shader->stages.size(), 0);
 
     for (size_t i = 0; i < impl->shader->stages.size(); ++i) {
         const auto& s = impl->shader->stages[i];
@@ -3532,7 +3537,7 @@ RfxPipeline rfxCreateRayTracingPipeline(const RfxRayTracingPipelineDesc* desc) {
         return 0;
     };
 
-    std::vector<nri::ShaderGroupDesc> groups(desc->groupCount);
+    RfxVector<nri::ShaderGroupDesc> groups(desc->groupCount);
     for (uint32_t i = 0; i < desc->groupCount; ++i) {
         const auto& src = desc->groups[i];
         if (src.type == RFX_SHADER_GROUP_GENERAL) {
@@ -3570,7 +3575,7 @@ RfxPipeline rfxCreateRayTracingPipeline(const RfxRayTracingPipelineDesc* desc) {
 
 RfxShaderBindingTable rfxCreateShaderBindingTable(RfxPipeline pipeline) {
     RfxPipelineImpl* pipelineImpl = (RfxPipelineImpl*)pipeline;
-    RfxShaderBindingTableImpl* impl = new RfxShaderBindingTableImpl();
+    RfxShaderBindingTableImpl* impl = RfxNew<RfxShaderBindingTableImpl>();
 
     const nri::DeviceDesc& dev = CORE.NRI.GetDeviceDesc(*CORE.NRIDevice);
     uint64_t identifierSize = dev.shaderStage.rayTracing.shaderGroupIdentifierSize;
@@ -3593,10 +3598,10 @@ RfxShaderBindingTable rfxCreateShaderBindingTable(RfxPipeline pipeline) {
     nri::BindBufferMemoryDesc bmd = { impl->buffer, impl->memory, 0 };
     NRI_CHECK(CORE.NRI.BindBufferMemory(&bmd, 1));
 
-    std::vector<uint8_t> rawIds(groupCount * identifierSize);
+    RfxVector<uint8_t> rawIds(groupCount * identifierSize);
     CORE.NRI.WriteShaderGroupIdentifiers(*pipelineImpl->pipeline, 0, groupCount, rawIds.data());
 
-    std::vector<uint8_t> alignedData(impl->size);
+    RfxVector<uint8_t> alignedData(impl->size);
     for (uint32_t i = 0; i < groupCount; ++i) {
         memcpy(alignedData.data() + (i * impl->stride), rawIds.data() + (i * identifierSize), identifierSize);
     }
@@ -3650,7 +3655,7 @@ void rfxDestroyShaderBindingTable(RfxShaderBindingTable sbt) {
     rfxDeferDestruction([=]() {
         CORE.NRI.DestroyBuffer(sbt->buffer);
         CORE.NRI.FreeMemory(sbt->memory);
-        delete sbt;
+        RfxDelete(sbt);
     });
 }
 
@@ -3687,9 +3692,9 @@ void rfxCmdDispatchRaysIndirect(RfxCommandList cmd, RfxBuffer argsBuffer, uint64
 }
 
 RfxMicromap rfxCreateMicromap(const RfxMicromapDesc* desc) {
-    RfxMicromapImpl* impl = new RfxMicromapImpl();
+    RfxMicromapImpl* impl = RfxNew<RfxMicromapImpl>();
 
-    std::vector<nri::MicromapUsageDesc> usages(desc->usageCount);
+    RfxVector<nri::MicromapUsageDesc> usages(desc->usageCount);
     for (uint32_t i = 0; i < desc->usageCount; ++i) {
         usages[i].triangleNum = desc->usages[i].count;
         usages[i].subdivisionLevel = desc->usages[i].subdivisionLevel;
@@ -3721,7 +3726,7 @@ void rfxDestroyMicromap(RfxMicromap micromap) {
     rfxDeferDestruction([=]() {
         CORE.NRI.DestroyMicromap(ptr->micromap);
         CORE.NRI.FreeMemory(ptr->memory);
-        delete ptr;
+        RfxDelete(ptr);
     });
 }
 
@@ -3787,7 +3792,7 @@ bool rfxIsUpscalerSupported(RfxUpscalerType type) {
 }
 
 RfxUpscaler rfxCreateUpscaler(const RfxUpscalerDesc* desc) {
-    RfxUpscalerImpl* impl = new RfxUpscalerImpl();
+    RfxUpscalerImpl* impl = RfxNew<RfxUpscalerImpl>();
     impl->type = desc->type;
 
     nri::UpscalerDesc ud = {};
@@ -3799,7 +3804,7 @@ RfxUpscaler rfxCreateUpscaler(const RfxUpscalerDesc* desc) {
     ud.commandBuffer = nullptr;
 
     if (CORE.NRI.CreateUpscaler(*CORE.NRIDevice, ud, impl->upscaler) != nri::Result::SUCCESS) {
-        delete impl;
+        RfxDelete(impl);
         return nullptr;
     }
 
@@ -3895,7 +3900,7 @@ void rfxDestroyUpscaler(RfxUpscaler upscaler) {
     RfxUpscalerImpl* ptr = upscaler;
     rfxDeferDestruction([=]() {
         CORE.NRI.DestroyUpscaler(ptr->upscaler);
-        delete ptr;
+        RfxDelete(ptr);
     });
 }
 
@@ -3993,7 +3998,7 @@ void rfxCmdSetShadingRate(
 }
 
 RfxCommandList rfxCreateCommandList(RfxQueueType queueType) {
-    RfxCommandListImpl* impl = new RfxCommandListImpl();
+    RfxCommandListImpl* impl = RfxNew<RfxCommandListImpl>();
     impl->queueType = queueType;
     impl->isSecondary = true;
 
@@ -4020,8 +4025,8 @@ void rfxDestroyCommandList(RfxCommandList cmd) {
     if (!cmd || !cmd->isSecondary)
         return;
 
-    std::vector<nri::CommandBuffer*> buffers = std::move(cmd->buffers);
-    std::vector<nri::CommandAllocator*> allocators = std::move(cmd->allocators);
+    RfxVector<nri::CommandBuffer*> buffers = std::move(cmd->buffers);
+    RfxVector<nri::CommandAllocator*> allocators = std::move(cmd->allocators);
 
     rfxDeferDestruction([=]() {
         for (auto* cb : buffers)
@@ -4029,7 +4034,7 @@ void rfxDestroyCommandList(RfxCommandList cmd) {
         for (auto* ca : allocators)
             CORE.NRI.DestroyCommandAllocator(ca);
     });
-    delete cmd;
+    RfxDelete(cmd);
 }
 
 void rfxBeginCommandList(RfxCommandList cmd) {
@@ -4066,14 +4071,14 @@ void rfxSubmitCommandListAsync(
     RfxCommandList cmd, RfxFence* waitFences, uint64_t* waitValues, uint32_t waitCount, RfxFence* signalFences, uint64_t* signalValues,
     uint32_t signalCount
 ) {
-    std::vector<nri::FenceSubmitDesc> waits(waitCount);
+    RfxVector<nri::FenceSubmitDesc> waits(waitCount);
     for (uint32_t i = 0; i < waitCount; ++i) {
         waits[i].fence = waitFences[i]->fence;
         waits[i].value = waitValues[i];
         waits[i].stages = nri::StageBits::ALL;
     }
 
-    std::vector<nri::FenceSubmitDesc> signals(signalCount);
+    RfxVector<nri::FenceSubmitDesc> signals(signalCount);
     for (uint32_t i = 0; i < signalCount; ++i) {
         signals[i].fence = signalFences[i]->fence;
         signals[i].value = signalValues[i];
@@ -4143,7 +4148,7 @@ void rfxCmdClearStorageTexture(RfxCommandList cmd, RfxTexture texture, RfxColor 
 }
 
 RfxFence rfxCreateFence(uint64_t initialValue) {
-    RfxFenceImpl* impl = new RfxFenceImpl();
+    RfxFenceImpl* impl = RfxNew<RfxFenceImpl>();
     impl->value = initialValue;
     NRI_CHECK(CORE.NRI.CreateFence(*CORE.NRIDevice, initialValue, impl->fence));
     return impl;
@@ -4155,7 +4160,7 @@ void rfxDestroyFence(RfxFence fence) {
     RfxFenceImpl* ptr = fence;
     rfxDeferDestruction([=]() {
         CORE.NRI.DestroyFence(ptr->fence);
-        delete ptr;
+        RfxDelete(ptr);
     });
 }
 
@@ -4182,7 +4187,7 @@ rfxCreateTextureView(RfxTexture original, RfxFormat format, uint32_t mip, uint32
     if (layer + layerCount > original->state->totalLayers)
         layerCount = original->state->totalLayers - layer;
 
-    RfxTextureImpl* impl = new RfxTextureImpl();
+    RfxTextureImpl* impl = RfxNew<RfxTextureImpl>();
     impl->texture = original->texture;
     impl->memory = nullptr;
     impl->isView = true;
@@ -4265,7 +4270,7 @@ rfxCreateTextureView(RfxTexture original, RfxFormat format, uint32_t mip, uint32
 }
 
 RfxQueryPool rfxCreateQueryPool(RfxQueryType type, uint32_t capacity) {
-    RfxQueryPoolImpl* impl = new RfxQueryPoolImpl();
+    RfxQueryPoolImpl* impl = RfxNew<RfxQueryPoolImpl>();
     impl->type = type;
     nri::QueryPoolDesc qpd = {};
     qpd.queryType = (type == RFX_QUERY_TYPE_TIMESTAMP) ? nri::QueryType::TIMESTAMP : nri::QueryType::OCCLUSION;
@@ -4280,7 +4285,7 @@ void rfxDestroyQueryPool(RfxQueryPool pool) {
     RfxQueryPoolImpl* ptr = pool;
     rfxDeferDestruction([=]() {
         CORE.NRI.DestroyQueryPool(ptr->pool);
-        delete ptr;
+        RfxDelete(ptr);
     });
 }
 
@@ -4493,7 +4498,7 @@ void rfxCmdWriteAccelerationStructureSize(
     }
     cmd->FlushBarriers();
 
-    std::vector<const nri::AccelerationStructure*> nriHandles(count);
+    RfxVector<const nri::AccelerationStructure*> nriHandles(count);
     for (uint32_t i = 0; i < count; ++i) {
         nriHandles[i] = ((RfxAccelerationStructureImpl*)asArray[i])->as;
     }
@@ -4568,7 +4573,7 @@ static void BuildNRIPipeline(RfxPipelineImpl* impl) {
         gpd.multisample = &ms;
 
         // colors
-        std::vector<nri::ColorAttachmentDesc> colorDescs;
+        RfxVector<nri::ColorAttachmentDesc> colorDescs;
         if (desc->attachmentCount > 0 && desc->attachments) {
             colorDescs.resize(desc->attachmentCount);
             for (uint32_t i = 0; i < desc->attachmentCount; ++i) {
@@ -4643,7 +4648,7 @@ static void BuildNRIPipeline(RfxPipelineImpl* impl) {
         }
 
         // shaders
-        std::vector<nri::ShaderDesc> sds;
+        RfxVector<nri::ShaderDesc> sds;
         bool explicitVertex = (desc->vsEntryPoint != nullptr);
 
         for (auto& s : impl->shader->stages) {
@@ -4668,7 +4673,7 @@ static void BuildNRIPipeline(RfxPipelineImpl* impl) {
         // vertex input
         nri::VertexInputDesc vid = {};
         nri::VertexStreamDesc vs = { 0, nri::VertexStreamStepRate::PER_VERTEX };
-        std::vector<nri::VertexAttributeDesc> vads;
+        RfxVector<nri::VertexAttributeDesc> vads;
 
         bool hasVertexStage = (impl->shader->stageMask & nri::StageBits::VERTEX_SHADER);
 
@@ -4714,8 +4719,8 @@ static void BuildNRIPipeline(RfxPipelineImpl* impl) {
         nri::StageBits rtMask = nri::StageBits::RAYGEN_SHADER | nri::StageBits::ANY_HIT_SHADER | nri::StageBits::CLOSEST_HIT_SHADER |
                                 nri::StageBits::MISS_SHADER | nri::StageBits::INTERSECTION_SHADER | nri::StageBits::CALLABLE_SHADER;
 
-        std::vector<nri::ShaderDesc> stageDescs;
-        std::vector<uint32_t> stageToLibraryIndex(impl->shader->stages.size(), 0);
+        RfxVector<nri::ShaderDesc> stageDescs;
+        RfxVector<uint32_t> stageToLibraryIndex(impl->shader->stages.size(), 0);
 
         for (size_t i = 0; i < impl->shader->stages.size(); ++i) {
             const auto& s = impl->shader->stages[i];
@@ -4746,7 +4751,7 @@ static void BuildNRIPipeline(RfxPipelineImpl* impl) {
             return 0;
         };
 
-        std::vector<nri::ShaderGroupDesc> groups(desc->groupCount);
+        RfxVector<nri::ShaderGroupDesc> groups(desc->groupCount);
         for (uint32_t i = 0; i < desc->groupCount; ++i) {
             const auto& src = desc->groups[i];
             if (src.type == RFX_SHADER_GROUP_GENERAL) {
@@ -4783,7 +4788,7 @@ static void BuildNRIPipeline(RfxPipelineImpl* impl) {
 }
 
 static void ProcessShaderReloads() {
-    std::set<RfxShader> toReload;
+    RfxSet<RfxShader> toReload;
     {
         std::lock_guard<std::mutex> lock(CORE.HotReloadMutex);
         if (CORE.ShadersToReload.empty())
@@ -4796,11 +4801,11 @@ static void ProcessShaderReloads() {
         RfxShaderImpl* impl = (RfxShaderImpl*)shader;
         printf("[Rafx] Reloading shader: %s...\n", impl->filepath.c_str());
 
-        std::vector<const char*> definesPtrs;
+        RfxVector<const char*> definesPtrs;
         for (const auto& s : impl->defines)
             definesPtrs.push_back(s.c_str());
 
-        std::vector<const char*> includesPtrs;
+        RfxVector<const char*> includesPtrs;
         for (const auto& s : impl->includeDirs)
             includesPtrs.push_back(s.c_str());
 
@@ -4824,7 +4829,7 @@ static void ProcessShaderReloads() {
             impl->bindings = std::move(newImpl->bindings);
 
             newImpl->pipelineLayout = nullptr;
-            delete newImpl;
+            RfxDelete(newImpl);
 
             for (auto* pipeline : impl->dependentPipelines) {
                 nri::Pipeline* oldPipe = pipeline->pipeline;
@@ -4919,7 +4924,7 @@ void rfxBeginFrame() {
     uint32_t frameIdx = CORE.FrameIndex % GetQueuedFrameNum();
     {
         auto& q = CORE.Graveyard[frameIdx];
-        std::vector<std::function<void()>> readyTasks = std::move(q.tasks);
+        RfxVector<std::function<void()>> readyTasks = std::move(q.tasks);
         q.tasks.clear();
 
         for (auto& task : readyTasks)
@@ -4980,7 +4985,7 @@ void rfxBeginFrame() {
     CORE.SwapChainWrapper.layerOffset = 0;
 
     if (!CORE.SwapChainWrapper.state) {
-        CORE.SwapChainWrapper.state = new RfxTextureSharedState();
+        CORE.SwapChainWrapper.state = RfxNew<RfxTextureSharedState>();
         CORE.SwapChainWrapper.state->totalMips = 1;
         CORE.SwapChainWrapper.state->totalLayers = 1;
         CORE.SwapChainWrapper.state->subresourceStates.resize(1);

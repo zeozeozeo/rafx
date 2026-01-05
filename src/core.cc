@@ -9,6 +9,109 @@
 
 CoreData CORE = {};
 
+#if _WIN32
+
+static void* AlignedMalloc(void*, size_t size, size_t alignment) {
+    return _aligned_malloc(size, alignment);
+}
+
+static void* AlignedRealloc(void*, void* memory, size_t size, size_t alignment) {
+    return _aligned_realloc(memory, size, alignment);
+}
+
+static void AlignedFree(void*, void* memory) {
+    _aligned_free(memory);
+}
+
+#else
+
+static uint8_t* AlignMemory(uint8_t* memory, size_t alignment) {
+    return (uint8_t*)((size_t(memory) + alignment - 1) & ~(alignment - 1));
+}
+
+static void* AlignedMalloc(void*, size_t size, size_t alignment) {
+    uint8_t* memory = (uint8_t*)malloc(size + sizeof(uint8_t*) + alignment - 1);
+
+    if (memory == nullptr)
+        return nullptr;
+
+    uint8_t* alignedMemory = AlignMemory(memory + sizeof(uint8_t*), alignment);
+    uint8_t** memoryHeader = (uint8_t**)alignedMemory - 1;
+    *memoryHeader = memory;
+
+    return alignedMemory;
+}
+
+static void* AlignedRealloc(void* userArg, void* memory, size_t size, size_t alignment) {
+    if (memory == nullptr)
+        return AlignedMalloc(userArg, size, alignment);
+
+    uint8_t** memoryHeader = (uint8_t**)memory - 1;
+    uint8_t* oldMemory = *memoryHeader;
+    uint8_t* newMemory = (uint8_t*)realloc(oldMemory, size + sizeof(uint8_t*) + alignment - 1);
+
+    if (newMemory == nullptr)
+        return nullptr;
+
+    if (newMemory == oldMemory)
+        return memory;
+
+    uint8_t* alignedMemory = AlignMemory(newMemory + sizeof(uint8_t*), alignment);
+    memoryHeader = (uint8_t**)alignedMemory - 1;
+    *memoryHeader = newMemory;
+
+    return alignedMemory;
+}
+
+static void AlignedFree(void*, void* memory) {
+    if (memory == nullptr)
+        return;
+
+    uint8_t** memoryHeader = (uint8_t**)memory - 1;
+    uint8_t* oldMemory = *memoryHeader;
+    free(oldMemory);
+}
+
+#endif
+
+// allocator
+RfxAllocator g_Allocator = { AlignedMalloc, AlignedRealloc, AlignedFree, nullptr };
+
+void* RfxAlloc(size_t size, size_t align) {
+    return g_Allocator.allocate(g_Allocator.userArg, size, align);
+}
+
+void* RfxRealloc(void* ptr, size_t size, size_t align) {
+    return g_Allocator.reallocate(g_Allocator.userArg, ptr, size, align);
+}
+
+void RfxFree(void* ptr) {
+    g_Allocator.free(g_Allocator.userArg, ptr);
+}
+
+void rfxSetAllocator(const RfxAllocator* allocator) {
+    if (allocator && allocator->allocate && allocator->free) {
+        g_Allocator = *allocator;
+    } else {
+        g_Allocator = { AlignedMalloc, AlignedRealloc, AlignedFree, nullptr };
+    }
+}
+
+void* NRI_CALL InternalNriAlloc(void* userArg, size_t size, size_t alignment) {
+    RfxAllocator* alloc = (RfxAllocator*)userArg;
+    return alloc->allocate(alloc->userArg, size, alignment);
+}
+
+void* NRI_CALL InternalNriRealloc(void* userArg, void* memory, size_t size, size_t alignment) {
+    RfxAllocator* alloc = (RfxAllocator*)userArg;
+    return alloc->reallocate(alloc->userArg, memory, size, alignment);
+}
+
+void NRI_CALL InternalNriFree(void* userArg, void* memory) {
+    RfxAllocator* alloc = (RfxAllocator*)userArg;
+    alloc->free(alloc->userArg, memory);
+}
+
 void rfxDeferDestruction(std::function<void()>&& task) {
     if (!CORE.NRIDevice) {
         task();
@@ -46,7 +149,7 @@ CoreData::~CoreData() {
                 NRI.DestroyDescriptor(ptr->descriptorAttachment);
             NRI.DestroyTexture(ptr->texture);
             NRI.FreeMemory(ptr->memory);
-            delete ptr;
+            RfxDelete(ptr);
             DepthBuffer.handle = nullptr;
         }
 
@@ -58,7 +161,7 @@ CoreData::~CoreData() {
                 NRI.DestroyDescriptor(ptr->descriptorAttachment);
             NRI.DestroyTexture(ptr->texture);
             NRI.FreeMemory(ptr->memory);
-            delete ptr;
+            RfxDelete(ptr);
             MSAAColorBuffer.handle = nullptr;
         }
 
@@ -229,6 +332,10 @@ static void NRIInitialize(nri::GraphicsAPI graphicsAPI) {
     dcd.enableNRIValidation = CORE.EnableValidation;
     dcd.vkBindingOffsets = { 0, 128, 32, 64 };
     dcd.adapterDesc = &adapterDesc[0];
+    dcd.allocationCallbacks.Allocate = InternalNriAlloc;
+    dcd.allocationCallbacks.Reallocate = InternalNriRealloc;
+    dcd.allocationCallbacks.Free = InternalNriFree;
+    dcd.allocationCallbacks.userArg = &g_Allocator;
     NRI_CHECK(nri::nriCreateDevice(dcd, CORE.NRIDevice));
 
     NRI_CHECK(nri::nriGetInterface(*CORE.NRIDevice, NRI_INTERFACE(nri::CoreInterface), (nri::CoreInterface*)&CORE.NRI));
