@@ -144,6 +144,13 @@ if(CMAKE_HOST_WIN32)
     set(SLANG_BIN_PACKAGE_NAME "windows-x86_64.zip")
 elseif(CMAKE_HOST_LINUX)
     set(SLANG_BIN_PACKAGE_NAME "linux-x86_64.zip")
+elseif(CMAKE_HOST_APPLE)
+    # detect apple silicon or intel
+    if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+        set(SLANG_BIN_PACKAGE_NAME "macosx-aarch64.zip")
+    else()
+        set(SLANG_BIN_PACKAGE_NAME "macosx-x86_64.zip")
+    endif()
 else()
     message(FATAL_ERROR "Unsupported host")
 endif()
@@ -181,14 +188,6 @@ if(RAFX_STATIC_SLANG)
         add_library(slang::slang ALIAS slang)
     endif()
 else()
-    if(CMAKE_HOST_WIN32)
-        set(SLANG_BIN_PACKAGE_NAME "windows-x86_64.zip")
-    elseif(CMAKE_HOST_LINUX)
-        set(SLANG_BIN_PACKAGE_NAME "linux-x86_64.zip")
-    else()
-        message(FATAL_ERROR "Unsupported host for Slang binaries")
-    endif()
-
     if (NOT slang_SOURCE_DIR)
         CPMAddPackage(
             NAME slang
@@ -211,6 +210,12 @@ else()
                 IMPORTED_LOCATION               "${slang_SOURCE_DIR}/lib/libslang.so"
             )
             target_link_libraries(slang::slang PUBLIC INTERFACE "${slang_SOURCE_DIR}/lib/libslang.so")
+        elseif(CMAKE_HOST_APPLE)
+            set_target_properties(slang::slang PROPERTIES
+                INTERFACE_INCLUDE_DIRECTORIES   "${slang_SOURCE_DIR}/include/"
+                IMPORTED_LOCATION               "${slang_SOURCE_DIR}/lib/libslang.dylib"
+            )
+            target_link_libraries(slang::slang PUBLIC INTERFACE "${slang_SOURCE_DIR}/lib/libslang.dylib")
         endif()
     endif()
 endif()

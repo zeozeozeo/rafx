@@ -27,6 +27,16 @@ jobs:
               -DCMAKE_C_COMPILER=clang
               -DCMAKE_CXX_COMPILER=clang++
               -DRAFX_USE_WAYLAND=ON
+          # apple silicon
+          - os: macos-14
+            artifact_name: rafx_release_macos_arm64.zip
+            cmake_args: >
+              -DCMAKE_BUILD_TYPE=Release
+          # intel
+          - os: macos-13
+            artifact_name: rafx_release_macos_x64.zip
+            cmake_args: >
+              -DCMAKE_BUILD_TYPE=Release
 
     steps:
       - name: Checkout repository
