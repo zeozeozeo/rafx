@@ -1890,12 +1890,14 @@ struct RafxFileSystem : public ISlangFileSystem {
         if (!outBlob)
             return SLANG_E_INVALID_ARG;
 
-        // Check VFS
+        namespace fs = std::filesystem;
+        fs::path p(path);
+
+        // check vfs
         {
             std::lock_guard<std::mutex> lock(CORE.VirtualFSMutex);
             auto it = m_VirtualFiles.find(path);
             if (it != m_VirtualFiles.end()) {
-                // Copy to ensure blob owns memory
                 size_t len = it->second.size();
                 char* buf = (char*)RfxAlloc(len * sizeof(char));
                 memcpy(buf, it->second.c_str(), len);
@@ -1904,26 +1906,26 @@ struct RafxFileSystem : public ISlangFileSystem {
             }
         }
 
-        if (strcmp(path, "rafx.slang") == 0) {
+        // check for embedded rafx.slang (always present)
+        if (p.filename() == "rafx.slang") {
             *outBlob = RfxNew<RafxMemoryBlob>(s_RafxSlangContent, strlen(s_RafxSlangContent), false);
             return SLANG_OK;
         }
 
-        FILE* f = fopen(path, "rb");
-        if (!f)
+        if (!fs::exists(p) || !fs::is_regular_file(p))
             return SLANG_E_NOT_FOUND;
 
-        fseek(f, 0, SEEK_END);
-        long size = ftell(f);
-        fseek(f, 0, SEEK_SET);
+        std::ifstream file(p, std::ios::binary);
+        if (!file.is_open())
+            return SLANG_E_CANNOT_OPEN;
 
+        size_t size = static_cast<size_t>(fs::file_size(p));
         char* buffer = (char*)RfxAlloc(size * sizeof(char));
-        if (fread(buffer, 1, size, f) != (size_t)size) {
+
+        if (!file.read(buffer, size)) {
             RfxFree(buffer);
-            fclose(f);
             return SLANG_E_CANNOT_OPEN;
         }
-        fclose(f);
 
         *outBlob = RfxNew<RafxMemoryBlob>(buffer, size, true);
         return SLANG_OK;
