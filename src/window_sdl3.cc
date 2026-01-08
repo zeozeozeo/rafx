@@ -149,6 +149,10 @@ bool Backend_CreateWindow(const char* title, int width, int height) {
     CORE.WindowHandle = win;
     g_ShouldClose = false;
 
+    // TODO: Should we have this on always? Probably not. At least not on mobile. I don't know.
+    //       https://github.com/libsdl-org/SDL/issues/9309
+    SDL_StartTextInput(win);
+
     // center
     if (CORE.WindowFlags & RFX_WINDOW_CENTERED) {
         SDL_SetWindowPosition(win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
@@ -186,6 +190,7 @@ bool Backend_CreateWindow(const char* title, int width, int height) {
 void Backend_DestroyWindow() {
     SDL_Window* win = (SDL_Window*)CORE.WindowHandle;
     if (win) {
+        SDL_StopTextInput(win);
         SDL_DestroyWindow(win);
         CORE.WindowHandle = nullptr;
     }
@@ -283,6 +288,19 @@ void Backend_PollEvents() {
             int mapped = MapSDLKey(event.key.key);
             if (mapped >= 0 && mapped < RFX_MAX_KEYS) {
                 CORE.Input.keysCurrent[mapped] = (event.type == SDL_EVENT_KEY_DOWN);
+                if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
+                    Input_PushKeyPressed(mapped);
+                }
+            }
+        } break;
+
+        case SDL_EVENT_TEXT_INPUT: {
+            const char* ptr = event.text.text;
+            uint32_t codepoint;
+            while ((codepoint = SDL_StepUTF8(&ptr, NULL)) != 0) {
+                if (codepoint != SDL_INVALID_UNICODE_CODEPOINT) {
+                    Input_PushCharPressed(codepoint);
+                }
             }
         } break;
 

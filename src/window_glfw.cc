@@ -24,16 +24,29 @@ static void GLFW_ErrorCallback(int32_t error, const char* message) {
     // clang-format on
 }
 
-static void KeyCallback(GLFWwindow* /* window */, int key, int /* scancode */, int action, int /* mods */) {
+static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    (void)window;
+    (void)scancode;
+    (void)mods;
     if (key < 0 || key >= RFX_MAX_KEYS)
         return;
-    if (action == GLFW_PRESS)
+
+    if (action == GLFW_PRESS) {
         CORE.Input.keysCurrent[key] = true;
-    else if (action == GLFW_RELEASE)
+        Input_PushKeyPressed(key);
+    } else if (action == GLFW_RELEASE) {
         CORE.Input.keysCurrent[key] = false;
+    }
 }
 
-static void MouseButtonCallback(GLFWwindow* /* window */, int button, int action, int /* mods */) {
+static void CharCallback(GLFWwindow* window, unsigned int codepoint) {
+    (void)window;
+    Input_PushCharPressed((uint32_t)codepoint);
+}
+
+static void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+    (void)window;
+    (void)mods;
     if (button < 0 || button >= RFX_MAX_MOUSE_BUTTONS)
         return;
     if (action == GLFW_PRESS)
@@ -42,20 +55,24 @@ static void MouseButtonCallback(GLFWwindow* /* window */, int button, int action
         CORE.Input.mouseButtonsCurrent[button] = false;
 }
 
-static void CursorPosCallback(GLFWwindow* /* window */, double xpos, double ypos) {
+static void CursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
+    (void)window;
     CORE.Input.mouseX = xpos;
     CORE.Input.mouseY = ypos;
 }
 
-static void WindowFocusCallback(GLFWwindow* /* window */, int focused) {
+static void WindowFocusCallback(GLFWwindow* window, int focused) {
+    (void)window;
     CORE.IsFocused = (focused != 0);
 }
 
-static void WindowIconifyCallback(GLFWwindow* /* window */, int iconified) {
+static void WindowIconifyCallback(GLFWwindow* window, int iconified) {
+    (void)window;
     CORE.IsMinimized = (iconified != 0);
 }
 
-static void FramebufferSizeCallback(GLFWwindow* /* window */, int width, int height) {
+static void FramebufferSizeCallback(GLFWwindow* window, int width, int height) {
+    (void)window;
     CORE.FramebufferWidth = width;
     CORE.FramebufferHeight = height;
 }
@@ -144,6 +161,7 @@ bool Backend_CreateWindow(const char* title, int width, int height) {
 
     // set cbs
     glfwSetKeyCallback(win, KeyCallback);
+    glfwSetCharCallback(win, CharCallback);
     glfwSetMouseButtonCallback(win, MouseButtonCallback);
     glfwSetCursorPosCallback(win, CursorPosCallback);
     glfwSetWindowFocusCallback(win, WindowFocusCallback);

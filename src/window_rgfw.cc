@@ -184,6 +184,15 @@ void Backend_PollEvents() {
             int mapped = MapRGFWKey(event.key.value);
             if (mapped >= 0 && mapped < RFX_MAX_KEYS) {
                 CORE.Input.keysCurrent[mapped] = (event.type == RGFW_keyPressed);
+                if (event.type == RGFW_keyPressed && !event.key.repeat) {
+                    Input_PushKeyPressed(mapped);
+                }
+            }
+            // HUGE TODO: RGFW doesn't do unicode, but I want it
+            if (event.type == RGFW_keyPressed) {
+                if (event.key.sym != 0) {
+                    Input_PushCharPressed((uint32_t)event.key.sym);
+                }
             }
         } else if (event.type == RGFW_mouseButtonPressed || event.type == RGFW_mouseButtonReleased) {
             int btn = -1;
@@ -200,6 +209,7 @@ void Backend_PollEvents() {
         } else if (event.type == RGFW_mousePosChanged) {
             CORE.Input.mouseX = event.mouse.x;
             CORE.Input.mouseY = event.mouse.y;
+        } else if (true) {
         } else if (event.type == RGFW_windowResized) {
             CORE.FramebufferWidth = win->w;
             CORE.FramebufferHeight = win->h;

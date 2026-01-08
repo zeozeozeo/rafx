@@ -19,7 +19,7 @@ option(RAFX_UPSCALER_FFX "Enable support for FFX (FidelityFX Super Resolution) u
 option(RAFX_UPSCALER_XESS "Enable support for XeSS upscaler" OFF)
 option(RAFX_BUILD_EXAMPLES "Build examples" OFF)
 option(RAFX_STATIC_SLANG "Build Slang from source instead of downloading binaries" OFF)
-option(RAFX_STATIC_SDL "Link SDL statically instead of building a shared library" OFF)
+option(RAFX_STATIC_SDL "Link SDL statically instead of building a shared library" ON)
 option(RAFX_STRIP_SDL "Disable useless SDL features" ON)
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 

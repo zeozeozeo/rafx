@@ -546,6 +546,44 @@ uint32_t rfxGetFrameIndex() {
 // Input
 //
 
+void Input_PushKeyPressed(int key) {
+    if (CORE.Input.keyPressedQueueCount < RFX_MAX_KEY_QUEUE) {
+        CORE.Input.keyPressedQueue[CORE.Input.keyPressedQueueCount] = key;
+        CORE.Input.keyPressedQueueCount++;
+    }
+}
+
+void Input_PushCharPressed(uint32_t codepoint) {
+    if (CORE.Input.charPressedQueueCount < RFX_MAX_CHAR_QUEUE) {
+        CORE.Input.charPressedQueue[CORE.Input.charPressedQueueCount] = codepoint;
+        CORE.Input.charPressedQueueCount++;
+    }
+}
+
+int rfxGetKeyPressed(void) {
+    int value = 0;
+    if (CORE.Input.keyPressedQueueCount > 0) {
+        value = CORE.Input.keyPressedQueue[0];
+        for (int i = 0; i < (CORE.Input.keyPressedQueueCount - 1); i++)
+            CORE.Input.keyPressedQueue[i] = CORE.Input.keyPressedQueue[i + 1];
+        CORE.Input.keyPressedQueue[CORE.Input.keyPressedQueueCount - 1] = 0;
+        CORE.Input.keyPressedQueueCount--;
+    }
+    return value;
+}
+
+uint32_t rfxGetCharPressed(void) {
+    uint32_t value = 0;
+    if (CORE.Input.charPressedQueueCount > 0) {
+        value = CORE.Input.charPressedQueue[0];
+        for (int i = 0; i < (CORE.Input.charPressedQueueCount - 1); i++)
+            CORE.Input.charPressedQueue[i] = CORE.Input.charPressedQueue[i + 1];
+        CORE.Input.charPressedQueue[CORE.Input.charPressedQueueCount - 1] = 0;
+        CORE.Input.charPressedQueueCount--;
+    }
+    return value;
+}
+
 bool rfxIsKeyDown(RfxKey key) {
     return (key >= 0 && key < 350) ? CORE.Input.keysCurrent[key] : false;
 }

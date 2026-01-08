@@ -109,6 +109,9 @@ void Backend_SetMouseCursor(RfxCursorType cursor);
 void Backend_GetNativeHandles(nri::Window& window);
 void Backend_EventSleep();
 
+void Input_PushKeyPressed(int key);
+void Input_PushCharPressed(uint32_t codepoint);
+
 //
 // Allocator
 //
@@ -472,6 +475,8 @@ struct RfxDenoiserImpl;
 
 #define RFX_MAX_KEYS 350
 #define RFX_MAX_MOUSE_BUTTONS 8
+#define RFX_MAX_KEY_QUEUE 16
+#define RFX_MAX_CHAR_QUEUE 16
 
 struct InputState {
     bool keysCurrent[RFX_MAX_KEYS];
@@ -480,6 +485,11 @@ struct InputState {
     bool mouseButtonsPrev[RFX_MAX_MOUSE_BUTTONS];
     double mouseX, mouseY, mouseDeltaX, mouseDeltaY;
     bool firstMouseFrame;
+
+    int keyPressedQueue[RFX_MAX_KEY_QUEUE];
+    int keyPressedQueueCount;
+    uint32_t charPressedQueue[RFX_MAX_CHAR_QUEUE];
+    int charPressedQueueCount;
 };
 
 struct CoreData {

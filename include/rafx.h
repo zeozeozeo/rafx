@@ -881,7 +881,7 @@ typedef enum {
 RAFX_API void rfxRequestBackend(RfxBackend backend, bool enableValidation); // Do this *before* opening the window
 RAFX_API bool rfxOpenWindow(const char* title, int width, int height);
 RAFX_API bool rfxSupportsFeatures(RfxFeatureSupportFlags features);
-RAFX_API RfxFeatureSupportFlags rfxGetSupportedFeatures();
+RAFX_API RfxFeatureSupportFlags rfxGetSupportedFeatures(void);
 RAFX_API void rfxSetSampleCount(int count);
 RAFX_API void rfxSetAnisotropy(int level);
 RAFX_API void rfxSetWindowFlags(RfxWindowFlags flags);
@@ -889,14 +889,14 @@ RAFX_API void rfxEnableWindowFlags(RfxWindowFlags flags);
 RAFX_API void rfxDisableWindowFlags(RfxWindowFlags flags);
 RAFX_API void rfxToggleWindowFlags(RfxWindowFlags flags);
 RAFX_API bool rfxHasWindowFlags(RfxWindowFlags flags);
-RAFX_API bool rfxWindowShouldClose();
-RAFX_API void rfxPollInputEvents();
+RAFX_API bool rfxWindowShouldClose(void);
+RAFX_API void rfxPollInputEvents(void);
 RAFX_API void rfxGetWindowSize(int* width, int* height);
-RAFX_API int rfxGetWindowWidth();
-RAFX_API int rfxGetWindowHeight();
-RAFX_API double rfxGetTime();
-RAFX_API float rfxGetDeltaTime();
-RAFX_API uint32_t rfxGetFrameIndex();
+RAFX_API int rfxGetWindowWidth(void);
+RAFX_API int rfxGetWindowHeight(void);
+RAFX_API double rfxGetTime(void);
+RAFX_API float rfxGetDeltaTime(void);
+RAFX_API uint32_t rfxGetFrameIndex(void);
 
 //
 // Input
@@ -912,6 +912,8 @@ RAFX_API void rfxGetMousePos(float* x, float* y);
 RAFX_API void rfxGetMouseDelta(float* x, float* y);
 RAFX_API void rfxSetMouseCursorVisible(bool visible);
 RAFX_API void rfxSetMouseCursor(RfxCursorType cursor);
+RAFX_API int rfxGetKeyPressed(void);
+RAFX_API uint32_t rfxGetCharPressed(void);
 
 //
 // Resources
@@ -935,8 +937,8 @@ rfxCreateTextureView(RfxTexture original, RfxFormat format, uint32_t mip, uint32
 RAFX_API void rfxDestroyTexture(RfxTexture texture);
 RAFX_API uint32_t rfxGetTextureId(RfxTexture texture);
 RAFX_API void* rfxGetTextureDescriptor(RfxTexture texture);
-RAFX_API RfxFormat rfxGetSwapChainFormat();
-RAFX_API RfxTexture rfxGetBackbufferTexture();
+RAFX_API RfxFormat rfxGetSwapChainFormat(void);
+RAFX_API RfxTexture rfxGetBackbufferTexture(void);
 
 // Samplers
 RAFX_API RfxSampler rfxCreateSampler(RfxFilter filter, RfxAddressMode addressMode);
@@ -976,14 +978,14 @@ RAFX_API void rfxSetPipelineName(RfxPipeline pipeline, const char* name);
 // Command list
 //
 
-RAFX_API RfxCommandList rfxGetCommandList(); // Main command list for current frame
+RAFX_API RfxCommandList rfxGetCommandList(void); // Main command list for current frame
 RAFX_API RfxCommandList rfxCreateCommandList(RfxQueueType queueType);
 RAFX_API void rfxDestroyCommandList(RfxCommandList cmd);
 RAFX_API void rfxBeginCommandList(RfxCommandList cmd);
 RAFX_API void rfxEndCommandList(RfxCommandList cmd);
 
-RAFX_API void rfxBeginFrame();
-RAFX_API void rfxEndFrame();
+RAFX_API void rfxBeginFrame(void);
+RAFX_API void rfxEndFrame(void);
 
 RAFX_API RfxFence rfxCreateFence(uint64_t initialValue);
 RAFX_API void rfxDestroyFence(RfxFence fence);
@@ -1093,7 +1095,7 @@ RAFX_API void rfxCmdTransitionTexture(RfxCommandList cmd, RfxTexture texture, Rf
 
 // GPU Profiler, CPU markers
 RAFX_API void rfxBeginMarker(const char* name);
-RAFX_API void rfxEndMarker();
+RAFX_API void rfxEndMarker(void);
 RAFX_API void rfxMarker(const char* name);
 RAFX_API void rfxCmdBeginEvent(RfxCommandList cmd, const char* name);
 RAFX_API void rfxCmdEndEvent(RfxCommandList cmd);
@@ -1115,7 +1117,7 @@ rfxCmdCopyQueries(RfxCommandList cmd, RfxQueryPool pool, uint32_t offset, uint32
 
 // Low latency (aka Reflex)
 RAFX_API void rfxSetLowLatencyMode(bool enabled, bool boost);
-RAFX_API void rfxLatencySleep();
+RAFX_API void rfxLatencySleep(void);
 RAFX_API void rfxSetLatencyMarker(RfxLatencyMarker marker);
 RAFX_API bool rfxGetLatencyReport(RfxLatencyReport* outReport);
 
@@ -1134,8 +1136,8 @@ typedef struct {
     bool linearColor;
 } RfxImGuiDrawData;
 
-RAFX_API bool rfxInitImGui();
-RAFX_API void rfxShutdownImGui();
+RAFX_API bool rfxInitImGui(void);
+RAFX_API void rfxShutdownImGui(void);
 RAFX_API void rfxCmdDrawImGui(RfxCommandList cmd, const RfxImGuiDrawData* data);
 
 //
