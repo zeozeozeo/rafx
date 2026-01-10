@@ -104,7 +104,7 @@ static u32 MapRfxFlagsToRGFW(RfxWindowFlags flags) {
         r |= RGFW_windowHide;
     if (flags & RFX_WINDOW_CENTERED)
         r |= RGFW_windowCenter;
-    if (flags & RFX_WINDOW_SCALE_TO_MONITOR)
+    if ((flags & RFX_WINDOW_NO_SCALE) == 0)
         r |= RGFW_windowScaleToMonitor;
     return r;
 }
@@ -241,6 +241,11 @@ int Backend_GetWindowWidth() {
 int Backend_GetWindowHeight() {
     RGFW_window* win = (RGFW_window*)CORE.WindowHandle;
     return win ? win->h : 0;
+}
+
+float Backend_GetWindowScale() {
+    // TODO
+    return 1.0f;
 }
 
 double Backend_GetTime() {

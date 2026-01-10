@@ -673,3 +673,7 @@ void rfxSetAnisotropy(int level) {
         CORE.NRI.UpdateDescriptorRanges(&update, 1);
     }
 }
+
+float rfxGetWindowScale() {
+    return Backend_GetWindowScale();
+}

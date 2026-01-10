@@ -96,7 +96,7 @@ static void ApplyGlfwCreationHints(RfxWindowFlags flags) {
     glfwWindowHint(GLFW_FLOATING, (flags & RFX_WINDOW_FLOATING) ? GLFW_TRUE : GLFW_FALSE);
     glfwWindowHint(GLFW_MAXIMIZED, (flags & RFX_WINDOW_MAXIMIZED) ? GLFW_TRUE : GLFW_FALSE);
     glfwWindowHint(GLFW_VISIBLE, (flags & RFX_WINDOW_HIDDEN) ? GLFW_FALSE : GLFW_TRUE);
-    glfwWindowHint(GLFW_SCALE_TO_MONITOR, (flags & RFX_WINDOW_SCALE_TO_MONITOR) ? GLFW_TRUE : GLFW_FALSE);
+    glfwWindowHint(GLFW_SCALE_TO_MONITOR, (flags & RFX_WINDOW_NO_SCALE) ? GLFW_FALSE : GLFW_TRUE);
 }
 
 static void* GlfwAllocWrapper(size_t size, void* user) {
@@ -335,6 +335,15 @@ int Backend_GetWindowHeight() {
     int h;
     Backend_GetWindowSize(nullptr, &h);
     return h;
+}
+
+float Backend_GetWindowScale() {
+    GLFWwindow* win = (GLFWwindow*)CORE.WindowHandle;
+    if (!win)
+        return 1.0f;
+    float x, y;
+    glfwGetWindowContentScale(win, &x, &y);
+    return x;
 }
 
 double Backend_GetTime() {

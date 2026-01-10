@@ -272,6 +272,10 @@ int main(void) {
         return 1;
     }
 
+    float scale = rfxGetWindowScale();
+    io.FontGlobalScale = scale;
+    ImGui::GetStyle().ScaleAllSizes(scale);
+
     std::vector<Particle> initialParticles(PARTICLE_COUNT);
     std::mt19937 rng(1337);
     std::uniform_real_distribution<float> distPos(-0.9f, 0.9f);

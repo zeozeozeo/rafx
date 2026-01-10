@@ -136,7 +136,7 @@ bool Backend_CreateWindow(const char* title, int width, int height) {
         sdlFlags |= SDL_WINDOW_MAXIMIZED;
     if (CORE.WindowFlags & RFX_WINDOW_HIDDEN)
         sdlFlags |= SDL_WINDOW_HIDDEN;
-    if (CORE.WindowFlags & RFX_WINDOW_SCALE_TO_MONITOR)
+    if ((CORE.WindowFlags & RFX_WINDOW_NO_SCALE) == 0)
         sdlFlags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
 
     SDL_Window* win = SDL_CreateWindow(title, width, height, sdlFlags);
@@ -363,6 +363,13 @@ int Backend_GetWindowHeight() {
     int h;
     Backend_GetWindowSize(nullptr, &h);
     return h;
+}
+
+float Backend_GetWindowScale() {
+    SDL_Window* win = (SDL_Window*)CORE.WindowHandle;
+    if (!win)
+        return 1.0f;
+    return SDL_GetWindowDisplayScale(win);
 }
 
 double Backend_GetTime() {

@@ -736,17 +736,17 @@ typedef RFX_ENUM(uint8_t, RfxMouseButton){
 };
 
 typedef RFX_ENUM(uint32_t, RfxWindowFlags){
-    RFX_WINDOW_VSYNC = RFX_BIT(0),            // Enable Vertical Sync
-    RFX_WINDOW_FULLSCREEN = RFX_BIT(1),       // Exclusive Fullscreen mode
-    RFX_WINDOW_BORDERLESS = RFX_BIT(2),       // Borderless Windowed mode
-    RFX_WINDOW_ALWAYS_ACTIVE = RFX_BIT(3),    // Continue rendering when window is not focused
-    RFX_WINDOW_NO_RESIZE = RFX_BIT(4),        // Disable window resizing by user
-    RFX_WINDOW_TRANSPARENT = RFX_BIT(5),      // Transparent framebuffer
-    RFX_WINDOW_FLOATING = RFX_BIT(6),         // Floating / Always on top
-    RFX_WINDOW_MAXIMIZED = RFX_BIT(7),        // Start maximized
-    RFX_WINDOW_HIDDEN = RFX_BIT(8),           // Start hidden
-    RFX_WINDOW_CENTERED = RFX_BIT(9),         // Center window on screen
-    RFX_WINDOW_SCALE_TO_MONITOR = RFX_BIT(10) // Scale content to monitor DPI/Scale
+    RFX_WINDOW_VSYNC = RFX_BIT(0),         // Enable Vertical Sync
+    RFX_WINDOW_FULLSCREEN = RFX_BIT(1),    // Exclusive Fullscreen mode
+    RFX_WINDOW_BORDERLESS = RFX_BIT(2),    // Borderless Windowed mode
+    RFX_WINDOW_ALWAYS_ACTIVE = RFX_BIT(3), // Continue rendering when window is not focused
+    RFX_WINDOW_NO_RESIZE = RFX_BIT(4),     // Disable window resizing by user
+    RFX_WINDOW_TRANSPARENT = RFX_BIT(5),   // Transparent framebuffer
+    RFX_WINDOW_FLOATING = RFX_BIT(6),      // Floating / Always on top
+    RFX_WINDOW_MAXIMIZED = RFX_BIT(7),     // Start maximized
+    RFX_WINDOW_HIDDEN = RFX_BIT(8),        // Start hidden
+    RFX_WINDOW_CENTERED = RFX_BIT(9),      // Center window on screen
+    RFX_WINDOW_NO_SCALE = RFX_BIT(10)      // Disable content scaling to monitor DPI/Scale (default is scaled)
 };
 
 typedef RFX_ENUM(uint32_t, RfxFeatureSupportFlags){
@@ -894,6 +894,7 @@ RAFX_API void rfxPollInputEvents(void);
 RAFX_API void rfxGetWindowSize(int* width, int* height);
 RAFX_API int rfxGetWindowWidth(void);
 RAFX_API int rfxGetWindowHeight(void);
+RAFX_API float rfxGetWindowScale(void);
 RAFX_API double rfxGetTime(void);
 RAFX_API float rfxGetDeltaTime(void);
 RAFX_API uint32_t rfxGetFrameIndex(void);

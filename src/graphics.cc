@@ -1192,7 +1192,11 @@ static void RecreateSwapChain(int w, int h) {
     scd.height = (uint16_t)h;
     scd.textureNum = 3;
     scd.queuedFrameNum = GetQueuedFrameNum();
-    CORE.NRI.CreateSwapChain(*CORE.NRIDevice, scd, CORE.NRISwapChain);
+
+    if (CORE.NRI.CreateSwapChain(*CORE.NRIDevice, scd, CORE.NRISwapChain) != nri::Result::SUCCESS) {
+        CORE.NRISwapChain = nullptr;
+        return;
+    }
 
     if (CORE.AllowLowLatency && CORE.LowLatencyEnabled) {
         nri::LatencySleepMode mode = {};
@@ -1298,6 +1302,9 @@ void rfxCmdBeginRenderPass(
 }
 
 void rfxCmdBeginSwapchainRenderPass(RfxCommandList cmd, RfxFormat depthStencilFormat, RfxColor clearColor) {
+    if (!CORE.NRISwapChain)
+        return;
+
     if (cmd->isRendering)
         rfxCmdEndRenderPass(cmd);
 
@@ -2967,7 +2974,7 @@ void rfxShutdownImGui() {
 }
 
 void rfxCmdDrawImGui(RfxCommandList cmd, const RfxImGuiDrawData* data) {
-    if (!CORE.ImguiRenderer || !data)
+    if (!CORE.ImguiRenderer || !data || !CORE.NRISwapChain)
         return;
 
     MustTransition(cmd);
@@ -4714,7 +4721,7 @@ void rfxBeginFrame() {
         RecreateSwapChain(currentW, currentH);
     }
 
-    if (CORE.SwapChainWidth == 0 || CORE.SwapChainHeight == 0)
+    if (CORE.SwapChainWidth == 0 || CORE.SwapChainHeight == 0 || !CORE.NRISwapChain)
         return;
 
     if (CORE.FrameIndex >= GetQueuedFrameNum()) {
@@ -4828,7 +4835,7 @@ void rfxBeginFrame() {
 }
 
 void rfxEndFrame() {
-    if (!CORE.FrameStarted)
+    if (!CORE.FrameStarted || !CORE.NRISwapChain)
         return;
     CORE.FrameStarted = false;
 

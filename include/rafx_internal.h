@@ -103,6 +103,7 @@ void Backend_PollEvents();
 void Backend_GetWindowSize(int* width, int* height);
 int Backend_GetWindowWidth();
 int Backend_GetWindowHeight();
+float Backend_GetWindowScale();
 double Backend_GetTime();
 void Backend_SetMouseCursorVisible(bool visible);
 void Backend_SetMouseCursor(RfxCursorType cursor);
