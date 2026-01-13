@@ -926,6 +926,7 @@ RAFX_API void rfxDestroyBuffer(RfxBuffer buffer);
 RAFX_API void* rfxMapBuffer(RfxBuffer buffer);
 RAFX_API void rfxUnmapBuffer(RfxBuffer buffer);
 RAFX_API uint32_t rfxGetBufferId(RfxBuffer buffer);
+RAFX_API uint64_t rfxGetBufferDeviceAddress(RfxBuffer buffer);
 
 // Textures
 RAFX_API RfxTexture

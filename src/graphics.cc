@@ -1749,6 +1749,10 @@ uint32_t rfxGetBufferId(RfxBuffer buffer) {
     return buffer ? buffer->bindlessIndex : 0;
 }
 
+uint64_t rfxGetBufferDeviceAddress(RfxBuffer buffer) {
+    return buffer ? CORE.NRI.GetBufferDeviceAddress(*buffer->buffer) : 0;
+}
+
 void rfxDestroyBuffer(RfxBuffer buffer) {
     if (!buffer)
         return;

@@ -60,11 +60,6 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Patch NRD for MacOS
-        if: runner.os == 'macOS'
-        run: |
-          sed -i '' 's/&computeShader.size/(size_t*)\&computeShader.size/g' thirdparty/NRD/Source/InstanceImpl.h
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
